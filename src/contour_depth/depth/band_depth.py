@@ -1,18 +1,20 @@
+from math import comb
 from time import time
 from itertools import combinations
 from functools import reduce
 import numpy as np
 from scipy.optimize import bisect
 
+from .utils import compute_inclusion_matrix
 
 def compute_depths(data,
-                   band_size=2,
                    modified=False,
-                   target_mean_depth: float = 1 / 6,
-                   return_data_mat=False,
-                   times_dict=None):
+                   fast=False,
+                   inclusion_mat=None,
+                   target_mean_depth: float = None, #1 / 6
+                   ):
     """
-    Calculate depth of a list of contours using the contour band depth (CBD) method.
+    Calculate depth of a list of contours using the contour band depth (CBD) method for J=2.
     :param data: list
         List of contours to calculate the CBD from. A contour is assumed to be
         represented as a binary mask with ones denoting inside and zeros outside
@@ -38,200 +40,166 @@ def compute_depths(data,
         depth_matrix: ndarray
     """
 
-    if modified:
-        return contour_band_depth_modified(data, band_size=band_size, target_mean_depth=target_mean_depth, times_dict=times_dict)
+    num_contours = len(data)
+
+    # Precomputed masks for modified versions
+    if modified and fast:
+        precompute_in = np.zeros_like(data[0])
+        for i in range(num_contours):
+            precompute_in += 1 - data[i]
+
+        precompute_out = np.zeros_like(data[0])
+        for i in range(num_contours):
+            precompute_out += data[i]/data[i].sum()
+
+    if not modified and fast and inclusion_mat is None:
+        print("Warning: pre-computed inclusion matrix not available, computing it ... ")
+        inclusion_mat = compute_inclusion_matrix(data)
+
+    if fast:
+        if target_mean_depth is not None:
+            raise ValueError("if using modified=True then targer_mean_depth should be None")            
+
+    if modified and not fast:
+        depths = band_depth_modified(data, target_mean_depth=target_mean_depth)
     else:
-        return contour_band_depth_strict(data, band_size=band_size, times_dict=times_dict)
+        depths = []
+        for i in range(num_contours):
+            if modified:
+                if fast:
+                    depth = band_depth_modified_fast(data[i], data, precompute_in=precompute_in, precompute_out=precompute_out)
+            else:
+                if fast:
+                    depth = band_depth_strict_fast(i, inclusion_mat)
+                else:
+                    depth = band_depth_strict(i, data)                
+            depths.append(depth)
+
+    return np.array(depths, dtype=float)
 
 
-def contour_band_depth_strict(data,
-                              band_size=2,
-                              times_dict=None):
-    record_times = False
-    if times_dict is not None and type(times_dict) == dict:
-        record_times = True
+def band_depth_strict(contour_index, data):
+    num_contours = len(data)
+    in_ci = data[contour_index]
+    in_band = 0    
+    for i in range(num_contours):
+        band_a = data[i]
+        for j in range(i, num_contours):
+            band_b = data[j]
+            if i != j:
+                subset_sum = band_a + band_b
 
-    if record_times:
-        t_start_preproc = time()
+                union = (subset_sum > 0).astype(float)
+                intersection = (subset_sum == 2).astype(float)
+
+                intersect_in_contour = np.all(((intersection + in_ci) == 2).astype(float) == intersection)
+                contour_in_union = np.all(((union + in_ci) == 2).astype(float) == in_ci)
+                if intersect_in_contour and contour_in_union:
+                    in_band += 1
+
+    return in_band/comb(num_contours, 2)
+
+
+def band_depth_strict_fast(contour_index, inclusion_mat):
+    num_contours = inclusion_mat[contour_index].size
+    num_subsets = comb(num_contours, 2)
+    in_count = (inclusion_mat[contour_index] > 0).sum()
+    out_count = (inclusion_mat[contour_index] < 0).sum()
+
+    return (in_count*out_count + num_contours - 1)/num_subsets
+
+
+def band_depth_modified(data,
+                        target_mean_depth: float = None, #1 / 6                        
+                        ):
 
     num_contours = len(data)
-    subsets = get_subsets(num_contours, band_size)
-    num_subsets = len(subsets)
+    num_subsets = comb(num_contours, 2)
 
-    # Compute fractional containment table
+    # Compute fractional containment tables
+    depth_matrix_left = np.zeros((num_contours, num_subsets))
+    depth_matrix_right = np.zeros((num_contours, num_subsets))
 
-    # - Each subset defines a band. To avoid redundant computations we
-    #   precompute these bands.
-    band_components = []
-    for i, subset in enumerate(subsets):
-        bc = get_band_components([data[j] for j in subset])  # {union:, intersection:, band:}
-        bc["members_id"] = i
-        bc["members_idx"] = subset
-        band_components.append(bc)
+    if target_mean_depth is None:
+        print("[cbd] Using modified band depths without threshold (mult agg)")
+    else:
+        print(f"[cbd] Using modified band depth with specified threshold {target_mean_depth} (max agg)")
 
-    if record_times:
-        t_end_preproc = time()
-        t_start_core = time()
+    for contour_index, in_ci in enumerate(data):
+        subset_id = 0
+        for i in range(num_contours):
+            band_a = data[i]
+            for j in range(i, num_contours):
+                band_b = data[j]
 
-    # - Get fractional containment tables
-    depth_matrix = np.zeros((num_contours, num_subsets))
+                if i != j:
+                    subset_sum = band_a + band_b
 
-    for i, binary_mask in enumerate(data):
-        for j, subset in enumerate(subsets):
+                    union = (subset_sum > 0).astype(float)
+                    intersection = (subset_sum == 2).astype(float)
+            
+                    lc_frac = (intersection - in_ci)
+                    lc_frac = (lc_frac > 0).sum()
+                    lc_frac = lc_frac / (intersection.sum() + np.finfo(float).eps)
 
-            bc = band_components[j]
-            idx_subset = bc["members_idx"]
-            union = bc["union"]
-            intersection = bc["intersection"]
+                    rc_frac = (in_ci - union)
+                    rc_frac = (rc_frac > 0).sum()
+                    rc_frac = rc_frac / (in_ci.sum() + np.finfo(float).eps)
 
-            in_band = 0
-            if i in idx_subset:  # contour is in band border
-                in_band = 1
-            else:
-                intersect_in_contour = np.all(((intersection + binary_mask) == 2).astype(float) == intersection)
-                contour_in_union = np.all(((union + binary_mask) == 2).astype(float) == binary_mask)
-                if intersect_in_contour and contour_in_union:
-                    in_band = 1
+                    depth_matrix_left[contour_index, subset_id] = lc_frac
+                    depth_matrix_right[contour_index, subset_id] = rc_frac
 
-            depth_matrix[i, j] = in_band
+                    subset_id += 1
+
+        print(depth_matrix_left[contour_index].sum(), depth_matrix_right[contour_index].sum())
+        
+    if target_mean_depth is None:  # No threshold            
+        depth_matrix_left = 1 - depth_matrix_left
+        depth_matrix_right = 1 - depth_matrix_right
+        depth_matrix = depth_matrix_left * depth_matrix_right #np.minimum(depth_matrix_left, depth_matrix_left)
+    else:            
+        def mean_depth_deviation(mat, threshold, target):
+            return target - (((mat < threshold).astype(float)).sum(axis=1) / num_subsets).mean()
+    
+        depth_matrix = np.maximum(depth_matrix_left, depth_matrix_right)
+        try:
+            t = bisect(lambda v: mean_depth_deviation(depth_matrix, v, target_mean_depth), depth_matrix.min(),
+                    depth_matrix.max())
+        except RuntimeError:
+            print("[cbd] Binary search failed to converge")
+            t = depth_matrix.mean()
+        print(f"[cbd] Using t={t}")
+
+        depth_matrix = (depth_matrix < t).astype(float)
 
     depths = depth_matrix.mean(axis=1)
 
-    if record_times:
-        t_end_core = time()
-
-    if record_times:
-        times_dict["time_preproc"] = t_end_preproc - t_start_preproc
-        times_dict["time_core"] = t_end_core - t_start_core
-
     return depths
 
 
-def contour_band_depth_modified(data,
-                                band_size=2,
-                                target_mean_depth: float = 1 / 6,
-                                times_dict=None):
-    record_times = False
-    if times_dict is not None and type(times_dict) == dict:
-        record_times = True
+def band_depth_modified_fast(in_ci, masks, precompute_in=None, precompute_out=None):
+    num_contours = len(masks)
+    num_subsets = comb(num_contours, 2)
 
-    if record_times:
-        t_start_preproc = time()
+    # if precompute_in is None:
+    precompute_in = np.zeros_like(in_ci)
+    for i in range(num_contours):
+        precompute_in += 1 - masks[i]
+    # if precompute_out is None:
+    precompute_out = np.zeros_like(in_ci)
+    for i in range(num_contours):
+        precompute_out += masks[i]/masks[i].sum()
 
-    num_contours = len(data)
-    subsets = get_subsets(num_contours, band_size)
-    num_subsets = len(subsets)
+    # precompute_in -= (1 - in_ci)
+    # precompute_out -= in_ci/in_ci.sum()
 
-    # Compute fractional containment table
+    IN_in = num_contours - ((in_ci / in_ci.sum()) * precompute_in).sum()
+    IN_out = num_contours - ((1-in_ci) * precompute_out).sum()
 
-    # - Each subset defines a band. To avoid redundant computations we
-    #   precompute these bands.
-    band_components = []
-    for i, subset in enumerate(subsets):
-        bc = get_band_components([data[j] for j in subset])  # {union:, intersection:, band:}
-        bc["members_id"] = i
-        bc["members_idx"] = subset
-        band_components.append(bc)
+    print(IN_in, IN_out)
 
-    # - Get fractional containment tables
-    depth_matrix = np.zeros((num_contours, num_subsets))
-
-    if record_times:
-        t_end_preproc = time()
-        t_start_core = time()
-
-    for i, binary_mask in enumerate(data):
-        for j, subset in enumerate(subsets):
-
-            bc = band_components[j]
-            idx_subset = bc["members_idx"]
-            union = bc["union"]
-            intersection = bc["intersection"]
-
-            if i in idx_subset:  # contour is in band border
-                p_outside_of_band = 0
-            else:
-                lc_frac = (intersection - binary_mask)
-                lc_frac = (lc_frac > 0).sum()
-                lc_frac = lc_frac / (intersection.sum() + np.finfo(float).eps)
-
-                rc_frac = (binary_mask - union)
-                rc_frac = (rc_frac > 0).sum()
-                rc_frac = rc_frac / (binary_mask.sum() + np.finfo(float).eps)
-
-                p_outside_of_band = np.maximum(lc_frac, rc_frac)
-
-            depth_matrix[i, j] = p_outside_of_band
-
-    def mean_depth_deviation(mat, threshold, target):
-        return target - (((mat < threshold).astype(float)).sum(axis=1) / num_subsets).mean()
-
-    depth_matrix_t = depth_matrix.copy()
-    if target_mean_depth is None:  # No threshold
-        print("[cbd] Using modified band depths without threshold")
-        depth_matrix_t = 1 - depth_matrix_t
-    else:
-        print(f"[cbd] Using modified band depth with specified threshold {target_mean_depth}")
-        try:
-            t = bisect(lambda v: mean_depth_deviation(depth_matrix_t, v, target_mean_depth), depth_matrix_t.min(),
-                       depth_matrix_t.max())
-        except:
-            print("[cbd] Binary search failed to converge")
-            t = depth_matrix_t.mean()
-        print(f"[cbd] Using t={t}")
-
-        depth_matrix_t = (depth_matrix < t).astype(float)
-
-    depths = depth_matrix_t.mean(axis=1)
-
-    if record_times:
-        t_end_core = time()
-
-    if record_times:
-        times_dict["time_preproc"] = t_end_preproc - t_start_preproc
-        times_dict["time_core"] = t_end_core - t_start_core
-
-    return depths
+    # return (IN_in * IN_out + num_contours - 1)/(2*num_subsets)
+    return (IN_in * IN_out)/(2*num_subsets)
 
 
-def get_band_components(band_members):
-    """
-    Computes necessary components to perform the
-    band test.
-    :param band_members: list
-        Binary masks of contours that make the band.
-    :return:
-        band_components: dict with union and intersection of band members
-    """
-    num_band_members = len(band_members)
-    subset_array = np.concatenate([bm[:, :, np.newaxis] for bm in band_members], axis=-1)
-    subset_sum = subset_array.sum(axis=-1)
 
-    union = (subset_sum > 0)
-    intersection = (subset_sum == num_band_members)
-    union = union.astype(float)
-    intersection = intersection.astype(float)
-    # Commented because these are not needed to perform the band checking
-    # band = union + intersection
-    # band[band != 1.0] = 0.0
-    # band = band.astype(float)
-
-    return dict(union=union, intersection=intersection)
-
-
-def get_subsets(num_members, subset_size=2):
-    """
-    Returns a list of subsets of the indicated size.
-    subset_size can be an int or a list of ints with the sizes.
-    Min subset_size is 2 and max subset_size is num_members//2
-    """
-    member_idx = np.arange(num_members).tolist()
-    if type(subset_size) == int:
-        subset_size = [subset_size, ]
-
-    subsets = []
-    for ss in subset_size:
-        for idx in combinations(member_idx, ss):
-            subsets.append(idx)
-
-    return subsets
