@@ -151,12 +151,12 @@ def band_depth_modified(data,
 
                     subset_id += 1
 
-        print(depth_matrix_left[contour_index].sum(), depth_matrix_right[contour_index].sum())
+        # print(depth_matrix_left[contour_index].sum(), depth_matrix_right[contour_index].sum())
         
     if target_mean_depth is None:  # No threshold            
         depth_matrix_left = 1 - depth_matrix_left
         depth_matrix_right = 1 - depth_matrix_right
-        depth_matrix = depth_matrix_left * depth_matrix_right #np.minimum(depth_matrix_left, depth_matrix_left)
+        depth_matrix = np.minimum(depth_matrix_left, depth_matrix_left)  # depth_matrix_left * depth_matrix_right
     else:            
         def mean_depth_deviation(mat, threshold, target):
             return target - (((mat < threshold).astype(float)).sum(axis=1) / num_subsets).mean()
@@ -203,3 +203,47 @@ def band_depth_modified_fast(in_ci, masks, precompute_in=None, precompute_out=No
 
 
 
+
+
+# def band_depth_modified(data):
+
+#     num_contours = len(data)
+#     num_subsets = comb(num_contours, 2)
+
+#     # Compute fractional containment tables
+#     depth_matrix_left = np.zeros((num_contours, num_subsets))
+#     depth_matrix_right = np.zeros((num_contours, num_subsets))
+
+#     for contour_index, in_ci in enumerate(data):
+#         subset_id = 0
+#         for i in range(num_contours):
+#             band_a = data[i]
+#             for j in range(i, num_contours):
+#                 band_b = data[j]
+
+#                 if i != j:
+#                     subset_sum = band_a + band_b
+
+#                     union = (subset_sum > 0).astype(float)
+#                     intersection = (subset_sum == 2).astype(float)
+            
+#                     lc_frac = (intersection - in_ci)
+#                     lc_frac = (lc_frac > 0).sum()
+#                     lc_frac = lc_frac / (intersection.sum() + np.finfo(float).eps)
+
+#                     rc_frac = (in_ci - union)
+#                     rc_frac = (rc_frac > 0).sum()
+#                     rc_frac = rc_frac / (in_ci.sum() + np.finfo(float).eps)
+
+#                     depth_matrix_left[contour_index, subset_id] = lc_frac
+#                     depth_matrix_right[contour_index, subset_id] = rc_frac
+
+#                     subset_id += 1
+        
+#     depth_matrix_left = 1 - depth_matrix_left
+#     depth_matrix_right = 1 - depth_matrix_right
+#     depth_matrix = depth_matrix_left * depth_matrix_right
+
+#     depths = depth_matrix.mean(axis=1)
+
+#     return depths
