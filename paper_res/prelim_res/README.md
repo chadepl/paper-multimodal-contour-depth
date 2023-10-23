@@ -12,7 +12,7 @@ Interestingly, this was not the case with the modified depths, which hinted at a
 **Implications**: I need to find examples that allow me to illustrate the functioning of ddclust. 
 It seems the best way to do it is to start from the examples in the paper, which concerns multi-dimensional points, and think of contour ensembles that, when reduced, would yield such point clouds.
 
-IMAGE
+![Image validating assumption of shape family separability](red_explainer/shape_families-seed_1.png)
 
 # Validating separability of clusters
 
