@@ -1,4 +1,5 @@
-
+"""Characterizes depth-based clustering for contours.
+Where does it help? Where does it not help?"""
 import numpy as np
 import matplotlib.pyplot as plt
 

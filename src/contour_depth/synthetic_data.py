@@ -139,7 +139,7 @@ def shape_families(num_masks, num_rows, num_cols, return_labels=False, seed=None
         labels.append(0)
 
     # family B
-    for i in range(num_masks//2):
+    for i in range(num_masks - num_masks//2):
         radius = radii[i]
         
         theta = np.linspace(0, 2*np.pi, 100)

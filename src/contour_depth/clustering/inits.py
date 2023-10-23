@@ -27,7 +27,7 @@ def initial_clustering(masks, num_components, feat_mat=None, pre_pca=False, meth
         mat = pca_embedder.fit_transform(mat)
     
     if method == "random":
-        labs = rng.randint(0, num_components, num_masks)
+        labs = rng.integers(0, num_components, num_masks)
     elif method == "kmeans":
         labs = KMeans(n_clusters=num_components).fit_predict(mat)
     elif method == "ahc":
