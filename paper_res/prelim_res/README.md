@@ -22,4 +22,4 @@ I visually evaluated the separability of the clusters on these scatterplots for 
 
 **Implications**: Read the implications for 'Testing shape families assumption'.
 
-![Image validating separability of clusters](prelim_res/contour_embedder/shape_families-seed_1.png)
+![Image validating separability of clusters](contour_embedder/shape_families-seed_1.png)
