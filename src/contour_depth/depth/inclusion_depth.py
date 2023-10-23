@@ -9,7 +9,7 @@ There are three versions of boundary depth:
 from time import time
 import numpy as np
 from skimage.measure import find_contours
-from .utils import compute_inclusion_matrix, get_sdfs, get_masks_matrix
+from .utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix, get_sdfs, get_masks_matrix
 
 def compute_depths(data,                   
                    modified=False,
@@ -52,9 +52,12 @@ def compute_depths(data,
         for i in range(num_contours):
             precompute_out += data[i]/data[i].sum()
 
-    if not modified and not fast and inclusion_mat is None:
+    if not fast and inclusion_mat is None:
         print("Warning: pre-computed inclusion matrix not available, computing it ... ")
-        inclusion_mat = compute_inclusion_matrix(data)
+        if modified:
+            inclusion_mat = compute_epsilon_inclusion_matrix(data)
+        else:
+            inclusion_mat = compute_inclusion_matrix(data)
 
     if not modified and fast:
         print("Warning: the fast version is based on a paper that potentially has an error")
@@ -66,7 +69,7 @@ def compute_depths(data,
                 if fast:
                     depth = inclusion_depth_modified_fast(data[i], data, precompute_in=precompute_in, precompute_out=precompute_out)
                 else:
-                    depth = inclusion_depth_modified(data[i], data)
+                    depth = inclusion_depth_modified(i, inclusion_mat)
             else:
                 depth = inclusion_depth_strict(i, inclusion_mat)
 
@@ -77,8 +80,8 @@ def compute_depths(data,
 
 def inclusion_depth_strict(mask_index, inclusion_mat):
     num_masks = inclusion_mat[mask_index].size
-    in_count = (inclusion_mat[mask_index] > 0).sum()
-    out_count = (inclusion_mat[mask_index] < 0).sum()
+    in_count = (inclusion_mat[mask_index, :] > 0).sum()
+    out_count = (inclusion_mat[:, mask_index] > 0).sum()
 
     return np.minimum(in_count/num_masks, out_count/num_masks)
 
@@ -105,31 +108,9 @@ def inclusion_depth_strict_fast(data):
     return depths_fast_sdf.tolist()
 
 
-def inclusion_depth_modified(in_ci, masks):
-    num_masks = len(masks)
-    in_vals = []
-    out_vals = []
-
-    for j in range(num_masks):
-        in_cj = masks[j]
-
-        # the smaller eps_out becomes the less outside it is
-        # so when it is zero, we now it is inside
-        # we add a larger number to in matrix the more inside i is
-        eps_out = (in_ci - in_cj)
-        eps_out = (eps_out > 0).sum()
-        eps_out = eps_out / (in_ci.sum() + np.finfo(float).eps)
-        depth_in = 1 - eps_out
-        in_vals.append(depth_in)
-
-        # the smaller eps_in becomes, the less j is outside of i
-        # so when it is zero, we know i is outside of j
-        # we add a larger number to out matrix the more outside i is
-        eps_in = (in_cj - in_ci)
-        eps_in = (eps_in > 0).sum()
-        eps_in = eps_in / (in_cj.sum() + np.finfo(float).eps)
-        depth_out = 1 - eps_in
-        out_vals.append(depth_out)
+def inclusion_depth_modified(mask_index, inclusion_mat):
+    in_vals = inclusion_mat[mask_index, :]
+    out_vals = inclusion_mat[:, mask_index]
 
     return np.minimum(np.mean(in_vals), np.mean(out_vals))
 
@@ -148,7 +129,8 @@ def inclusion_depth_modified_fast(in_ci, masks, precompute_in=None, precompute_o
     IN_in = num_masks - ((in_ci / in_ci.sum()) * precompute_in).sum()
     IN_out = num_masks - ((1-in_ci) * precompute_out).sum()
 
-    return np.minimum(IN_in/num_masks, IN_out/num_masks)
+    # We remove from the count in_ci, which we do not consider as it adds to both IN_in and IN_out equally
+    return np.minimum((IN_in - 1)/num_masks, (IN_out - 1)/num_masks)
 
 
 

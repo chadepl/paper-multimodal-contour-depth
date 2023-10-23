@@ -14,7 +14,7 @@ from src.contour_depth.synthetic_data import circle_ensemble
 
 if __name__ == "__main__":
 
-    depth_fun = [inclusion_depth, contour_band_depth][1]
+    depth_fun = [inclusion_depth, contour_band_depth][0]
     
     N = 30
     masks = []
