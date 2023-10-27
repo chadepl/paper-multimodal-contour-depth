@@ -15,6 +15,7 @@ def compute_depths(data,
                    modified=False,
                    fast=False,
                    inclusion_mat=None,
+                   verbose=False
                    ):
     """Calculate depth of a list of contours using the inclusion depth (ID) method.
 
@@ -52,28 +53,32 @@ def compute_depths(data,
         for i in range(num_contours):
             precompute_out += data[i]/data[i].sum()
 
-    if not fast and inclusion_mat is None:
-        print("Warning: pre-computed inclusion matrix not available, computing it ... ")
-        if modified:
+    if inclusion_mat is None:
+        if verbose:
+            print("Warning: pre-computed inclusion matrix not available, computing it ... ")
+        if modified:            
             inclusion_mat = compute_epsilon_inclusion_matrix(data)
         else:
             inclusion_mat = compute_inclusion_matrix(data)
 
+    # if not modified and fast:
+    #     print("Warning: the fast version is based on a paper that potentially has an error")
+    #     depths = inclusion_depth_strict_fast(data)
+    # else:
     if not modified and fast:
-        print("Warning: the fast version is based on a paper that potentially has an error")
-        depths = inclusion_depth_strict_fast(data)
-    else:
-        depths = []
-        for i in range(num_contours):
-            if modified:
-                if fast:
-                    depth = inclusion_depth_modified_fast(data[i], data, precompute_in=precompute_in, precompute_out=precompute_out)
-                else:
-                    depth = inclusion_depth_modified(i, inclusion_mat)
+        if verbose:
+            print("Warning: for ID no faster version than O(N2) available, ")
+    depths = []
+    for i in range(num_contours):
+        if modified:
+            if fast:
+                depth = inclusion_depth_modified_fast(data[i], data, precompute_in=precompute_in, precompute_out=precompute_out)
             else:
-                depth = inclusion_depth_strict(i, inclusion_mat)
+                depth = inclusion_depth_modified(i, inclusion_mat)
+        else:
+            depth = inclusion_depth_strict(i, inclusion_mat)
 
-            depths.append(depth)
+        depths.append(depth)
 
     return np.array(depths, dtype=float)
 
