@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, "..")
 from src.contour_depth.depth.inclusion_depth import compute_depths as inclusion_depth
 from src.contour_depth.depth.band_depth import compute_depths as contour_band_depth
-from src.contour_depth.synthetic_data import circle_ensemble
+from src.contour_depth.data.synthetic_data import circle_ensemble
 
 if __name__ == "__main__":
 

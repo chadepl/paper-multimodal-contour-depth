@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from src.contour_depth.synthetic_data import magnitude_modes, three_rings, shape_families
+from src.contour_depth.data.synthetic_data import magnitude_modes, three_rings, shape_families
 from src.contour_depth.utils import get_masks_matrix, get_sdfs
 from src.contour_depth.clustering import ddclust
 from src.contour_depth.clustering import inits
