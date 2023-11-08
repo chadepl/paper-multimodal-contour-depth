@@ -43,7 +43,7 @@ if False:
     plt.show()
 
 labs = inits.initial_clustering(masks, num_components=2, method="random", seed=init_seed)
-pred_labs, sil_i, red_i, cost_i = ddclust.ddclust(masks, labs, cost_lamb=1.0, depth_notion="cbd", use_modified=True, use_fast=False, output_extra_info=True, seed=ddclust_seed)
+pred_labs, sil_i, red_i, cost_i = ddclust.ddclust(masks, labs, cost_lamb=1.0, depth_notion="id", use_modified=True, use_fast=False, output_extra_info=True, seed=ddclust_seed)
 fig, axs = plt.subplots(ncols=2, figsize=(12, 8))
 ecmwf.plot_contours_with_bg(masks, red_i, data_dir.joinpath("picking_background.png"), is_color_categorical=False, fname=None, ax=axs[0])
 ecmwf.plot_contours_with_bg(masks, pred_labs, data_dir.joinpath("picking_background.png"), is_color_categorical=True, fname=None, ax=axs[1])

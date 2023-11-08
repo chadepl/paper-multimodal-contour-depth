@@ -5,7 +5,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 
-from contour_depth.depth.utils import get_sdfs, get_masks_matrix
+from contour_depth.utils import get_sdfs, get_masks_matrix
 
 
 def initial_clustering(masks, num_components, feat_mat=None, pre_pca=False, method="kmeans", seed=None):

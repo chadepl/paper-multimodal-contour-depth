@@ -9,7 +9,7 @@ from sklearn.manifold import TSNE
 import sys
 sys.path.insert(0, "../..")
 
-from src.contour_depth.synthetic_data import magnitude_modes, three_rings, shape_families
+from src.contour_depth.data.synthetic_data import magnitude_modes, three_rings, shape_families
 from src.contour_depth.depth.utils import get_masks_matrix, get_sdfs, compute_inclusion_matrix
 
 num_masks = 30

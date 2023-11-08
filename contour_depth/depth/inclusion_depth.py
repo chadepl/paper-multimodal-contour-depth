@@ -17,6 +17,8 @@ def compute_depths(data,
                    modified=False,
                    fast=False,
                    inclusion_mat=None,
+                   precompute_in=None,
+                   precompute_out=None,
                    verbose=False
                    ):
     """Calculate depth of a list of contours using the inclusion depth (ID) method.
@@ -47,13 +49,10 @@ def compute_depths(data,
 
     # Precomputed masks for modified versions
     if modified and fast:
-        precompute_in = np.zeros_like(data[0])
-        for i in range(num_contours):
-            precompute_in += 1 - data[i]
-
-        precompute_out = np.zeros_like(data[0])
-        for i in range(num_contours):
-            precompute_out += data[i]/data[i].sum()
+        if precompute_in is None:
+            precompute_in = get_precompute_in(data)
+        if precompute_out is None:
+            precompute_out = get_precompute_out(data)
 
     if inclusion_mat is None:
         if verbose:
@@ -125,13 +124,9 @@ def inclusion_depth_modified(mask_index, inclusion_mat):
 def inclusion_depth_modified_fast(in_ci, masks, precompute_in=None, precompute_out=None):
     num_masks = len(masks)
     if precompute_in is None:
-        precompute_in = np.zeros_like(in_ci)
-        for i in range(num_masks):
-            precompute_in += 1 - masks[i]
+        precompute_in = get_precompute_in(masks)
     if precompute_out is None:
-        precompute_out = np.zeros_like(in_ci)
-        for i in range(num_masks):
-            precompute_out += masks[i]/masks[i].sum()
+        precompute_out = get_precompute_out
 
     IN_in = num_masks - ((in_ci / in_ci.sum()) * precompute_in).sum()
     IN_out = num_masks - ((1-in_ci) * precompute_out).sum()
@@ -140,4 +135,14 @@ def inclusion_depth_modified_fast(in_ci, masks, precompute_in=None, precompute_o
     return np.minimum((IN_in - 1)/num_masks, (IN_out - 1)/num_masks)
 
 
+def get_precompute_in(masks):
+    precompute_in = np.zeros_like(masks[0])
+    for i in range(len(masks)):
+        precompute_in += 1 - masks[i]
+    return precompute_in
 
+def get_precompute_out(masks):
+    precompute_out = np.zeros_like(masks[0])
+    for i in range(len(masks)):
+        precompute_out += masks[i]/masks[i].sum()
+    return precompute_out

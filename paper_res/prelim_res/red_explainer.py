@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, "../..")
 
-from src.contour_depth.synthetic_data import magnitude_modes, three_rings, shape_families
+from src.contour_depth.data.synthetic_data import magnitude_modes, three_rings, shape_families
 from src.contour_depth.depth.utils import compute_inclusion_matrix
 from src.contour_depth.clustering.ddclust import compute_red, compute_sil, compute_cost
 from src.contour_depth.clustering.inits import initial_clustering
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     num_masks = 30
     num_rows = num_cols = 512
     
-    depth_notion = ["id", "cbd"][0]
+    depth_notion = ["id", "cbd"][1]
     use_modified = False
     use_fast = False
 
@@ -51,19 +51,33 @@ if __name__ == "__main__":
         axs[row, 1].bar(x_range, cost_i, color=colors)
 
         axs[row, 2].set_title(f"Sil: {sil_i.mean():.4f}")
-        axs[row, 2].axhline(y=0, color="black")
-        axs[row, 2].bar(x_range, sil_a, color=colors)
-        axs[row, 2].bar(x_range, -sil_a, color=colors, alpha=0.3)
-        axs[row, 2].bar(x_range, -sil_b, color=colors)
-    
-        axs[row, 3].set_title(f"ReD: {red_i.mean():.4f}")
+        axs[row, 2].set_ylabel("Silhouette width")
+        axs[row, 2].set_xlabel("Index")
+        axs[row, 2].bar(x_range, sil_i, color=colors)        
+
+        axs[row, 3].set_title("Sil_a, Sil_b")
+        axs[row, 3].set_ylabel("Silhouette width")
+        axs[row, 3].set_xlabel("Index")
         axs[row, 3].axhline(y=0, color="black")
-        axs[row, 3].bar(x_range, red_w, color=colors)
-        axs[row, 3].bar(x_range, -red_w, color=colors, alpha=0.3)
-        axs[row, 3].bar(x_range, -red_b, color=colors)
+        axs[row, 3].bar(x_range, sil_a, color=colors)
+        axs[row, 3].bar(x_range, -sil_a, color=colors, alpha=0.3)
+        axs[row, 3].bar(x_range, -sil_b, color=colors)
+    
+        axs[row, 4].set_title(f"ReD: {red_i.mean():.4f}")
+        axs[row, 4].set_ylabel(f"Depth ({depth_notion})")
+        axs[row, 4].set_xlabel("Index")
+        axs[row, 4].bar(x_range, red_i, color=colors)
+
+        axs[row, 5].set_title("D_w, D_b")
+        axs[row, 5].set_ylabel(f"Depth ({depth_notion})")
+        axs[row, 5].set_xlabel("Index")
+        axs[row, 5].axhline(y=0, color="black")
+        axs[row, 5].bar(x_range, red_w, color=colors)
+        axs[row, 5].bar(x_range, -red_w, color=colors, alpha=0.3)
+        axs[row, 5].bar(x_range, -red_b, color=colors)
 
 
-    fig, axs = plt.subplots(nrows=3, ncols=4, figsize=(12, 8), layout="tight")
+    fig, axs = plt.subplots(nrows=3, ncols=6, figsize=(15, 10), layout="tight")
     
     labs_colors_map = ["red", "blue", "orange"]    
 
@@ -76,7 +90,7 @@ if __name__ == "__main__":
     plot_row(num_masks, labs, sil_i, sil_a, sil_b, red_i, red_w, red_b, cost_i, axs, 0, title=f"GT labels")
 
     # Second row: AHC allocation
-    pred_labs = initial_clustering(masks, num_components=num_components, method="ahc", pre_pca=True)
+    pred_labs = initial_clustering(masks, num_components=num_components, method="ahc", pre_pca=True, seed=seed)
     sil_i, sil_a, sil_b, competing_clusters = compute_sil(inclusion_mat, pred_labs)
     red_i, red_w, red_b, medians = compute_red(masks, pred_labs, competing_clusters=competing_clusters, depth_notion=depth_notion, use_modified=use_modified, use_fast=use_fast)
     colors = [labs_colors_map[l] for l in pred_labs]
@@ -84,12 +98,12 @@ if __name__ == "__main__":
     plot_row(num_masks, pred_labs, sil_i, sil_a, sil_b, red_i, red_w, red_b, cost_i, axs, 1, title=f"AHC labels")
 
     # Third row: random allocation
-    pred_labs = initial_clustering(masks, num_components=num_components, method="random")
+    pred_labs = initial_clustering(masks, num_components=num_components, method="random", seed=seed)
     sil_i, sil_a, sil_b, competing_clusters = compute_sil(inclusion_mat, pred_labs)
     red_i, red_w, red_b, medians = compute_red(masks, pred_labs, competing_clusters=competing_clusters, depth_notion=depth_notion, use_modified=use_modified, use_fast=use_fast)
     colors = [labs_colors_map[l] for l in pred_labs]
 
     plot_row(num_masks, pred_labs, sil_i, sil_a, sil_b, red_i, red_w, red_b, cost_i, axs, 2, title=f"Random labels")
 
-    fig.savefig(f"red_explainer/{dataset}-seed_{seed}.png")
+    fig.savefig(f"red_explainer/{dataset}-seed_{seed}-{depth_notion}-mod_{use_modified}-fast_{use_fast}.png")
     plt.show()

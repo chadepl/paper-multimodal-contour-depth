@@ -204,6 +204,62 @@ def plot_contour_boxplot(masks, depths,
 # CLUSTERING #
 ##############
 
+def plot_clustering(masks, labs, ax=None):
+
+    ax_was_none = False
+    if ax is None:
+        ax_was_none = True
+        fig, ax = plt.subplots(layout="tight", figsize=(10, 10))
+    
+    cluster_ids = np.unique(labs)
+    #colors = ["red", "blue", "orange"]
+    for i, cluster_id in enumerate(cluster_ids):
+        contour_ids = np.where(labs == cluster_id)[0]
+        masks_subset = [masks[contour_id] for contour_id in contour_ids]
+        for mask in masks_subset:
+            plot_contour(mask, 
+                         iso_value=0.5, 
+                         plot_line=True, 
+                         line_kwargs=dict(c=colors[i], linewidth=1, alpha=0.5), 
+                         plot_markers=False, 
+                         markers_kwargs=None,
+                         smooth_line=True, ax=ax)
+            
+    if ax_was_none:
+        plt.show()
+    else:
+        return ax
+
+
+def plot_red(red_within, red_between=None, plot_red=False, labs=None, ax=None):
+    
+    ax_was_none = False
+    if ax is None:
+        ax_was_none = True
+        fig, ax = plt.subplots(layout="tight", figsize=(10, 10))
+
+    #colors = ["red", "blue", "orange"]
+    num_contours = red_within.size
+    if labs is None:
+        cs = ["blue" for i in range(num_contours)]
+    else:
+        cs = [colors[l] for l in labs]
+    
+    ax.bar(np.arange(num_contours), red_within, color=cs)
+    if red_between is not None:
+        ax.bar(np.arange(num_contours), -red_between, color=cs)
+        if plot_red:
+            ax.bar(np.arange(num_contours), red_within-red_between, fill=False, color="black")
+        ax.axhline(y=0, c="black")
+        
+
+
+    if ax_was_none:
+        plt.show()
+    else:
+        return ax
+
+
 def plot_clustering_results(masks, clustering, sil_i, red_i, fn=None, suptitle=None):
     num_contours = len(masks)
     fig, axs = plt.subplots(ncols=3, figsize=(10, 8))

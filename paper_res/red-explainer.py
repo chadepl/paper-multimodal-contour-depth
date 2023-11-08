@@ -1,0 +1,141 @@
+"""For a clustering results, we show that the final state maximizes 
+depth over other configurations.
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+import sys 
+sys.path.insert(0, "..")
+from contour_depth.data.synthetic_data import three_rings, shape_families, magnitude_modes
+from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
+from contour_depth.depth.inclusion_depth import compute_depths
+from contour_depth.clustering.ddclust import compute_red, compute_red_within, compute_red_between
+from contour_depth.clustering.ddclust import compute_sil, compute_sil_within, compute_sil_between
+from contour_depth.visualization import plot_clustering, plot_red
+from contour_depth.clustering.inits import initial_clustering
+
+data_seed = 0
+init_seed = 0
+
+num_contours = 30
+# masks, labs = magnitude_modes(num_contours, 512, 512, modes_proportions=(0.5, 0.5), return_labels=True, seed=data_seed)
+masks, labs = three_rings(num_contours, 512, 512, (0.5, 0.3, 0.2), return_labels=True, seed=data_seed)
+#masks, labs = shape_families(num_contours, 512, 512, return_labels=True, seed=data_seed)
+labs_no_part = np.zeros(num_contours, dtype=int)
+labs = np.array(labs)
+num_clusters = np.unique(labs).size
+inclusion_mat = compute_inclusion_matrix(masks)
+epsilon_inclusion_mat = compute_epsilon_inclusion_matrix(masks)
+
+random_labs = initial_clustering(masks, num_components=num_clusters, feat_mat=None, pre_pca=False, method="random", seed=init_seed)
+
+rng = np.random.default_rng(data_seed)
+perturbed_labs = labs.copy()
+subset_contour_ids = rng.choice(np.arange(num_contours), 10, replace=False)
+shuffled_contour_clusters = labs[subset_contour_ids].copy()
+rng.shuffle(shuffled_contour_clusters)
+perturbed_labs[subset_contour_ids] = shuffled_contour_clusters
+
+
+def get_depth_data(masks, labs, n_components, inclusion_mat, use_modified=False):
+    red_w, medians = compute_red_within(masks, labs, n_components=n_components, 
+                   depth_notion="id", use_modified=use_modified, use_fast=False, inclusion_mat=inclusion_mat)
+    red_b, contour_cluster_rels = compute_red_between(masks, labs, n_components=n_components, competing_clusters=None,
+                        depth_notion="id", use_modified=use_modified, use_fast=False, inclusion_mat=inclusion_mat)
+    red_i = red_w - red_b
+    return red_i, red_w, red_b
+
+info_strict = []
+info_epsilon = []
+
+
+fig, axs = plt.subplots(nrows=3, ncols=4, layout="tight")
+
+# p1
+
+axs[0, 0].set_title("No partitioning")
+plot_clustering(masks, labs_no_part, ax=axs[0, 0])
+axs[0, 0].set_axis_off()
+
+unimodal_depths = compute_depths(masks, modified=False, fast=False, inclusion_mat=inclusion_mat)
+info_strict.append((unimodal_depths, unimodal_depths, np.zeros_like(unimodal_depths)))
+axs[1, 0].set_title(f"ID: {unimodal_depths.mean():.4f}")
+plot_red(unimodal_depths, np.zeros_like(unimodal_depths), plot_red=True, labs=labs_no_part, ax=axs[1, 0])
+
+unimodal_depths = compute_depths(masks, modified=True, fast=False, inclusion_mat=epsilon_inclusion_mat)
+info_epsilon.append((unimodal_depths, unimodal_depths, np.zeros_like(unimodal_depths)))
+axs[2, 0].set_title(f"eID: {unimodal_depths.mean():.4f}")
+plot_red(unimodal_depths, np.zeros_like(unimodal_depths), plot_red=True, labs=labs_no_part, ax=axs[2, 0])
+
+# p2
+
+axs[0, 1].set_title("Target labels")
+plot_clustering(masks, labs, ax=axs[0, 1])
+axs[0, 1].set_axis_off()
+
+red_i, red_w, red_b = get_depth_data(masks, labs, n_components=num_clusters, inclusion_mat=inclusion_mat, use_modified=False)
+info_strict.append((red_i, red_w, red_b))
+axs[1, 1].set_title(f"ID: {red_i.mean():.4f}")
+plot_red(red_w, red_b, plot_red=True, labs=labs, ax=axs[1, 1])
+
+red_i, red_w, red_b = get_depth_data(masks, labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
+info_epsilon.append((red_i, red_w, red_b))
+axs[2, 1].set_title(f"eID: {red_i.mean():.4f}")
+plot_red(red_w, red_b, plot_red=True, labs=labs, ax=axs[2, 1])
+
+# p3
+
+axs[0,2].set_title("Random labels")
+plot_clustering(masks, random_labs, ax=axs[0,2])
+axs[0,2].set_axis_off()
+
+red_i, red_w, red_b = get_depth_data(masks, random_labs, n_components=num_clusters, inclusion_mat=inclusion_mat, use_modified=False)
+info_strict.append((red_i, red_w, red_b))
+axs[1,2].set_title(f"ID: {red_i.mean():.4f}")
+plot_red(red_w, red_b, plot_red=True, labs=random_labs, ax=axs[1,2])
+
+red_i, red_w, red_b = get_depth_data(masks, random_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
+info_epsilon.append((red_i, red_w, red_b))
+axs[2,2].set_title(f"eID: {red_i.mean():.4f}")
+plot_red(red_w, red_b, plot_red=True, labs=random_labs, ax=axs[2,2])
+
+# p4
+
+axs[0,3].set_title("Some misplaced labels")
+plot_clustering(masks, perturbed_labs, ax=axs[0,3])
+axs[0,3].set_axis_off()
+
+red_i, red_w, red_b = get_depth_data(masks, perturbed_labs, n_components=num_clusters, inclusion_mat=inclusion_mat, use_modified=False)
+info_strict.append((red_i, red_w, red_b))
+axs[1,3].set_title(f"ID: {red_i.mean():.4f}")
+plot_red(red_w, red_b, plot_red=True, labs=perturbed_labs, ax=axs[1,3])
+
+red_i, red_w, red_b = get_depth_data(masks, perturbed_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
+info_epsilon.append((red_i, red_w, red_b))
+axs[2,3].set_title(f"eID: {red_i.mean():.4f}")
+plot_red(red_w, red_b, plot_red=True, labs=perturbed_labs, ax=axs[2,3])
+
+plt.show()
+
+
+#############################
+# Elements for paper figure #
+#############################
+
+labels = ["no_part", "gt", "random", "misplaced"]
+
+all_labs = [labs_no_part, labs, random_labs, perturbed_labs]
+for i, v in enumerate(all_labs):
+    fig, ax = plt.subplots(layout="tight", figsize=(3, 3))
+    plot_clustering(masks, v, ax=ax)
+    ax.set_axis_off()
+    fig.savefig(f"/Users/chadepl/Downloads/{labels[i]}.png", dpi=300)
+
+for i, (red_i, red_w, red_b) in enumerate(info_strict):
+    fig, ax = plt.subplots(layout="tight", figsize=(3, 3))
+    ax.set_title(f"Mean ReD: {red_i.mean():.4f}")
+    plot_red(red_w, red_b, plot_red=True, labs=all_labs[i], ax=ax)
+    ax.set_xlabel("Contour ID")
+    ax.set_ylabel("Depth")
+    fig.savefig(f"/Users/chadepl/Downloads/red-{labels[i]}.png", dpi=300)
+
+# TODO: add x and y labels
