@@ -22,7 +22,7 @@ def cdclust(masks, init_labs,
         print("[cdclust] Initializing ...")
     n_components = np.unique(init_labs).size
     cluster_sizes = np.array([np.where(init_labs == i)[0].size for i in range(n_components)])
-    assert not np.any(cluster_sizes < 3)  # no cluster should be smaller than 3 elements
+    #assert not np.any(cluster_sizes < 1)  # no cluster should be smaller than 3 elements
 
     if seed is None:
         rng = np.random.default_rng()
@@ -112,7 +112,7 @@ def cdclust(masks, init_labs,
             cluster_sizes = np.array([np.where(new_pred_labs == i)[0].size for i in range(n_components)])
             
             accept_clustering = False
-            if not np.any(cluster_sizes < 3):  # prevents clusters from getting too small
+            if not np.any(cluster_sizes < 1):  # prevents clusters from getting too small
 
                 # - update precomputed fields per partition
                 if use_fast:
@@ -131,7 +131,7 @@ def cdclust(masks, init_labs,
                 new_red_wi = compute_red_within(masks, new_pred_labs, n_components, 
                                     depth_notion=depth_notion, use_modified=use_modified, use_fast=use_fast, 
                                     inclusion_mat=inclusion_mat, precompute_ins=new_precomputed_ins, precompute_outs=new_precomputed_outs)
-                # new_competing_clusters = get_depth_competing_clusters(new_pred_labs, n_components, new_red_wi, inclusion_mat)
+                new_competing_clusters = get_depth_competing_clusters(new_pred_labs, n_components, new_red_wi, inclusion_mat)
                 new_red_bi, new_competing_clusters = compute_red_between(masks, new_pred_labs, n_components, competing_clusters=None,
                                             depth_notion=depth_notion, use_modified=use_modified, use_fast=use_fast,
                                             inclusion_mat=inclusion_mat, precompute_ins=new_precomputed_ins, precompute_outs=new_precomputed_outs)
@@ -468,6 +468,8 @@ def compute_sil(contours_mat, clustering, n_components):
 #   and  D^b(c_i) = min_{other clusters besides the one c_i's in} ID(c_i|other members in said cluster)
 
 # first we compute d_w
+# for ID, depth is not defined for clusters of size N>1 so we return 0
+# for CBD, depth is not defined for clusters of size N>2 so we return 0
 def compute_red_within(masks, clustering, n_components, 
                        depth_notion="id", use_modified=True, use_fast=True, 
                        inclusion_mat=None, precompute_ins=None, precompute_outs=None):
@@ -477,22 +479,25 @@ def compute_red_within(masks, clustering, n_components,
     for cluster_id in clustering_ids:
         contour_ids = np.where(clustering == cluster_id)[0]
         mask_subset = [masks[i] for i in contour_ids]
-        if use_modified and use_fast:
-            assert depth_notion == "id"  # only supported for depth_notion == "id"
-            precompute_in = precompute_ins[cluster_id] if cluster_id in precompute_ins else None
-            precompute_out = precompute_outs[cluster_id] if cluster_id in precompute_outs else None
-            depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, precompute_in=precompute_in, precompute_out=precompute_out)
+        if (depth_notion == "cbd" and contour_ids.size <= 2) or (depth_notion == "id" and contour_ids.size <= 1):                
+            depths = np.zeros_like(contour_ids.size)
         else:
-            inclusion_mat_subset = None
-            if inclusion_mat is not None:
-                inclusion_mat_subset = inclusion_mat[np.ix_(contour_ids, contour_ids)]
-                
-            if depth_notion == "id":
-                depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
-            elif depth_notion == "cbd":
-                depths = band_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
+            if use_modified and use_fast:
+                assert depth_notion == "id"  # only supported for depth_notion == "id"
+                precompute_in = precompute_ins[cluster_id] if precompute_ins is not None and cluster_id in precompute_ins else None
+                precompute_out = precompute_outs[cluster_id] if precompute_outs is not None and cluster_id in precompute_outs else None
+                depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, precompute_in=precompute_in, precompute_out=precompute_out)
             else:
-                raise ValueError("Unsupported depth notion (only id and cbd supported)")
+                inclusion_mat_subset = None
+                if inclusion_mat is not None:
+                    inclusion_mat_subset = inclusion_mat[np.ix_(contour_ids, contour_ids)]
+                    
+                if depth_notion == "id":
+                    depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
+                elif depth_notion == "cbd":
+                    depths = band_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
+                else:
+                    raise ValueError("Unsupported depth notion (only id and cbd supported)")
         depth_w[contour_ids] = depths
     return depth_w
 
@@ -505,18 +510,18 @@ def compute_red_between(masks, clustering, n_components, competing_clusters=None
     num_contours = len(masks)
     clustering_ids = np.arange(n_components)
     depth_b_cluster = np.empty((num_contours, n_components), dtype=float)    
-    # contour_cluster_rels = np.empty((num_contours, n_components), dtype=float)    
+    depth_delta_cluster = np.empty((num_contours, n_components), dtype=float)    
     for cluster_id1 in clustering_ids:
         contour_ids_1 = np.where(clustering == cluster_id1)[0]
         for contour_id in contour_ids_1:
             depth_b_cluster[contour_id, cluster_id1] = -np.inf
-            # contour_cluster_rels[contour_id, cluster_id1] = -np.inf
+            depth_delta_cluster[contour_id, cluster_id1] = -np.inf
             if competing_clusters is not None:  # we just want the depth of the competing cluster
                 competing_cids = [competing_clusters[contour_id], ]
                 other_cids = np.setdiff1d(np.setdiff1d(cluster_id1, cluster_id1), competing_clusters[contour_id])
                 for ocid in other_cids:
                     depth_b_cluster[contour_id, ocid] = -np.inf
-                    # contour_cluster_rels[contour_id, ocid] = -np.inf
+                    depth_delta_cluster[contour_id, ocid] = -np.inf
             else:
                 competing_cids = np.setdiff1d(clustering_ids, np.array([cluster_id1])) # all other clusters
             
@@ -524,38 +529,53 @@ def compute_red_between(masks, clustering, n_components, competing_clusters=None
                 contour_ids_2 = np.where(clustering == competing_cid)[0].tolist()
                 contour_ids_2.append(contour_id)
                 mask_subset = [masks[i] for i in contour_ids_2]
-                if use_modified and use_fast:
-                    assert depth_notion == "id"  # only supported for depth_notion == "id"
-                    precompute_in = precompute_ins[competing_cid] if competing_cid in precompute_ins else None
-                    precompute_out = precompute_outs[competing_cid] if competing_cid in precompute_outs else None
-                    if precompute_in is not None:
-                        precompute_in += 1 - contour_id
-                    if precompute_out is not None:
-                        precompute_out += contour_id/contour_id.sum()
-                    depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, precompute_in=precompute_in, precompute_out=precompute_out) 
+                if (depth_notion == "cbd" and len(contour_ids_2) <= 2) or (depth_notion == "id" and len(contour_ids_2) <= 1):                
+                    depths = np.zeros_like(len(contour_ids_2))
                 else:
-                    inclusion_mat_subset = None
-                    if inclusion_mat is not None:
-                        inclusion_mat_subset = inclusion_mat[np.ix_(contour_ids_2, contour_ids_2)]
-                        
-                    if depth_notion == "id":
-                        depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
-                    elif depth_notion == "cbd":
-                        depths = band_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
+                    if use_modified and use_fast:
+                        assert depth_notion == "id"  # only supported for depth_notion == "id"
+                        precompute_in = precompute_ins[competing_cid] if precompute_ins is not None and competing_cid in precompute_ins else None
+                        precompute_out = precompute_outs[competing_cid] if precompute_outs is not None and competing_cid in precompute_outs else None
+                        if precompute_in is not None:
+                            precompute_in += 1 - contour_id
+                        if precompute_out is not None:
+                            precompute_out += contour_id/contour_id.sum()
+                        depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, precompute_in=precompute_in, precompute_out=precompute_out) 
                     else:
-                        raise ValueError("Unsupported depth notion (only id and cbd supported)")
+                        inclusion_mat_subset = None
+                        if inclusion_mat is not None:
+                            inclusion_mat_subset = inclusion_mat[np.ix_(contour_ids_2, contour_ids_2)]
+                            
+                        if depth_notion == "id":
+                            depths = inclusion_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
+                        elif depth_notion == "cbd":
+                            depths = band_depths(mask_subset, modified=use_modified, fast=use_fast, inclusion_mat=inclusion_mat_subset)
+                        else:
+                            raise ValueError("Unsupported depth notion (only id and cbd supported)")
                     
                 depth_b_cluster[contour_id, competing_cid] = depths[-1]  # (from ddclust paper): we only want the depth of the last contour we appended
-                # contour_cluster_rels[contour_id, competing_cid] = depths.mean()  # we also want to keep track to the effect of adding a contour to a cluster
+                depth_delta_cluster[contour_id, competing_cid] = depths.mean()  # we also want to keep track to the effect of adding a contour to a cluster
     
     if competing_clusters is None:
         competing_clusters = np.argmax(depth_b_cluster, axis=1) # the competing cluster is the one with the highest depth
-    
-    depth_b = np.max(depth_b_cluster, axis=1) # the competing cluster is the one with the highest depth
+        # competing_clusters = np.argmax(depth_delta_cluster, axis=1) # the competing cluster is the one with the highest depth
+        # competing_clusters = np.argmax(depth_b_cluster - depth_delta_cluster, axis=1) # the competing cluster is the one with the highest depth
+        # from scipy.stats import rankdata
+        # ranks = rankdata(depth_b_cluster, method='min', axis=1) - 1
+        # ranks = ranks[:, 1:][:, ::-1]  # remove -np.inf column and flip so it is descending
+        # is_tie = []
+        # for r in ranks:
+        #     if np.where(r == r[0])[0].size > 1:
+        #         is_tie.append(True)
+        #     else:
+        #         is_tie.append(False)
+        # print(np.any(is_tie == True))
+
+    depth_b = np.array([depth_b_cluster[i, competing_cid] for i, competing_cid in enumerate(competing_clusters)]) # the competing cluster is the one with the highest depth
 
     return depth_b, competing_clusters
 
-def compute_red(masks, clustering, n_components, competing_clusters, depth_notion="id", use_modified=True, use_fast=True, inclusion_mat=None):
+def compute_red(masks, clustering, n_components, competing_clusters=None, depth_notion="id", use_modified=True, use_fast=True, inclusion_mat=None):
     red_w = compute_red_within(masks, clustering, n_components, depth_notion=depth_notion, use_modified=use_modified, use_fast=use_fast, inclusion_mat=inclusion_mat)
     red_b, competing_clusters = compute_red_between(masks, clustering, n_components, competing_clusters, depth_notion=depth_notion, use_modified=use_modified, use_fast=use_fast, inclusion_mat=inclusion_mat)
     red_i = red_w - red_b

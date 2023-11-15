@@ -89,6 +89,7 @@ def spaghetti_plot(masks, iso_value, under_mask=None, arr=None, is_arr_categoric
     elif type(highlight) is int:
         highlight = [highlight, ]
 
+    ax_was_none = False
     if ax is None:
         ax_was_none = True
         fig, ax = plt.subplots(layout="tight", figsize=(10, 10))
@@ -204,7 +205,48 @@ def plot_contour_boxplot(masks, depths,
 # CLUSTERING #
 ##############
 
-def plot_clustering(masks, labs, ax=None):
+def plot_clustering_eval(k_vals, metric_a, metric_a_id, metric_b=None, metric_b_id=None, metric_a_lab=None, metric_b_lab=None, ax=None):
+    
+    xmin_id = np.argmin(metric_a)
+    xmax_id = np.argmax(metric_a)
+    xmin = k_vals[xmin_id]
+    xmax = k_vals[xmax_id]
+
+    ax_was_none = False
+    if ax is None:
+        ax_was_none = True        
+        fig, ax = plt.subplots(layout="tight", figsize=(4, 3))
+
+    ax2 = None
+    if metric_b is not None:
+        ax2 = ax.twinx()
+    
+    lns1 = ax.plot(k_vals, metric_a, label=metric_a_id, c="orange")
+    ax.axvline(x=xmin, c="orange", linestyle="--")
+    ax.axvline(x=xmax, c="orange", linestyle="--")
+    ax.set_xlabel("Number of clusters (K)")
+    if metric_a_lab is not None:
+        ax.set_ylabel(metric_a_lab)
+
+    lns2 = None
+    if metric_b is not None:
+        lns2 = ax2.plot(k_vals, metric_b, label=metric_b_id, c="blue")
+        if metric_b_lab is not None:
+            ax2.set_ylabel(metric_b_lab)
+
+    # added these three lines
+    lns = lns1
+    if lns2 is not None:
+        lns += lns2
+    labs = [l.get_label() for l in lns]
+    ax.legend(lns, labs, loc="upper right")
+
+    if ax_was_none:
+        plt.show()
+    else:
+        return ax, ax2
+
+def plot_clustering(masks, labs, smooth_line=False, ax=None):
 
     ax_was_none = False
     if ax is None:
@@ -223,37 +265,85 @@ def plot_clustering(masks, labs, ax=None):
                          line_kwargs=dict(c=colors[i], linewidth=1, alpha=0.5), 
                          plot_markers=False, 
                          markers_kwargs=None,
-                         smooth_line=True, ax=ax)
+                         smooth_line=smooth_line, ax=ax)
             
     if ax_was_none:
         plt.show()
     else:
         return ax
 
+def sort_red(labs, red_within, red_between=None, sort_by=None):
 
-def plot_red(red_within, red_between=None, plot_red=False, labs=None, ax=None):
+    num_contours = red_within.size
+    clusters_idx = np.unique(labs)
+    
+    argsort = np.zeros_like(labs)
+    sorted_labs = labs.copy()
+    sorted_red_within = red_within.copy()
+    if red_between is not None:
+        sorted_red_between = red_between.copy()
+        red = sorted_red_within - sorted_red_between
+        sorted_red = red.copy()
+    else:
+        sorted_red_between = None
+        sorted_red = None
+        
+    if sort_by is None:
+        sort_by = "red_within"
+
+    start_id = 0
+
+    sorting_idx = np.zeros(num_contours, dtype=int)      
+    for cluster_id in clusters_idx:
+        coords = np.where(labs == cluster_id)[0]
+        if sort_by == "red_within":
+            arr = red_within[coords]
+        elif sort_by == "red_between" and red_between is not None:
+            arr = red_between[coords]
+        elif sort_by == "red" and red_between is not None:
+            arr = red[coords]
+        else:
+            raise ValueError("Make sure the passed values are correct.")
+                    
+        sorting_idx = np.argsort(arr)[::-1]
+        argsort[start_id:start_id + arr.size] = coords[sorting_idx]
+        sorted_labs[start_id:start_id + arr.size] = np.ones_like(sorting_idx) * cluster_id
+        sorted_red_within[start_id:start_id + arr.size] = red_within[coords[sorting_idx]]
+        if red_between is not None:
+            sorted_red_between[start_id:start_id + arr.size] = red_between[coords[sorting_idx]]
+            sorted_red[start_id:start_id + arr.size] = red[coords[sorting_idx]]
+        start_id += arr.size
+
+    return argsort, sorted_labs, sorted_red_within, sorted_red_between, sorted_red
+
+
+def plot_red(red_within, red_between=None, compute_red=False, labs=None, sort_by=None, ax=None):
+    
+    num_contours = red_within.size
+
+    if labs is None:
+        labs = np.zeros(num_contours, dtype=int)
+
+    if sort_by is not None:
+        argsort, labs, red_within, red_between, red = sort_red(labs, red_within, red_between, sort_by=sort_by)
+    else:
+        red = red_within - red_between if red_between is not None else None
     
     ax_was_none = False
     if ax is None:
         ax_was_none = True
         fig, ax = plt.subplots(layout="tight", figsize=(10, 10))
 
-    #colors = ["red", "blue", "orange"]
-    num_contours = red_within.size
-    if labs is None:
-        cs = ["blue" for i in range(num_contours)]
-    else:
-        cs = [colors[l] for l in labs]
+    #colors = ["red", "blue", "orange"]    
+    cs = [colors[l] for l in labs]
     
     ax.bar(np.arange(num_contours), red_within, color=cs)
     if red_between is not None:
-        ax.bar(np.arange(num_contours), -red_between, color=cs)
-        if plot_red:
-            ax.bar(np.arange(num_contours), red_within-red_between, fill=False, color="black")
+        ax.bar(np.arange(num_contours), np.negative(red_between), color=cs)
+        if compute_red:
+            ax.bar(np.arange(num_contours), red, fill=False, color="black")
         ax.axhline(y=0, c="black")
         
-
-
     if ax_was_none:
         plt.show()
     else:

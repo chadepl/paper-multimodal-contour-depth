@@ -16,45 +16,42 @@ def compute_depths(data,
                    ):
     """
     Calculate depth of a list of contours using the contour band depth (CBD) method for J=2.
-    :param data: list
+
+    Parameters
+    ----------
+    data: list
         List of contours to calculate the CBD from. A contour is assumed to be
         represented as a binary mask with ones denoting inside and zeros outside
         regions.
-    :param band_size: int
-        Number of contours to consider when forming the bands.
-    :param modified: bool
-        Whether to use or not the modified CBD (mCBD). This reduces the sensitivity of
+    modified : bool, optional
+        Whether to use or not the epsilon ID (eID). This reduces the sensitivity of
         the method to outliers but yields more informative depth estimates when curves
-        cross over a lot.
-    :param target_mean_depth: float
+        cross over a lot, by default False.
+    fast : bool, optional
+        Whether to use the fast implementation, by default False.
+    inclusion_mat : ndarray, optional
+        Square (N x N) numpy array with the inclusion relationships between 
+        contours, by default None.
+    target_mean_depth: float
         Only applicable if using mCBD. If None, returns the depths as is.
         If a float is specified, finds a threshold of the depth matrix that yields a
         target mean depth of `target_mean_depth` using binary search.
-    :param return_data_mat: ndarray
-        If true, in addition to the depths, returns the raw depth matrix which is of
-        dimensions n x (n combined band_size), where n = len(data).
-    :param times_dict: dict
-        If a dict is passed as `times_dict`, the times that different stages of the method
-        take are logged to this dict.
-    :return:
-        depths: ndarray
-        depth_matrix: ndarray
+    verbose: bool
+        Whether to print status messages to the console.
+
+    Returns
+    -------
+    ndarray
+        Depths of the N contours in data.
     """
 
     num_contours = len(data)
     num_subsets = comb(num_contours, 2)
 
-    # Precomputed masks for modified versions
     if modified and fast:
-        precompute_in = np.zeros_like(data[0])
-        for i in range(num_contours):
-            precompute_in += 1 - data[i]
+        raise NotImplementedError("CBD not available for modified=True and fast=True")
 
-        precompute_out = np.zeros_like(data[0])
-        for i in range(num_contours):
-            precompute_out += data[i]/data[i].sum()
-
-    if inclusion_mat is None:
+    if inclusion_mat is None and fast:
         if verbose:
             print("Warning: pre-computed inclusion matrix not available, computing it ... ")
         if modified:            
@@ -62,26 +59,22 @@ def compute_depths(data,
         else:
             inclusion_mat = compute_inclusion_matrix(data)
 
-    if fast:
-        if target_mean_depth is not None:
-            raise ValueError("if using modified=True then targer_mean_depth should be None")            
+    if not fast:
+        bands = compute_band_info(data)
 
     depths = []
     for i in range(num_contours):
-        if modified:
-            if fast:
-                depth = band_depth_modified_fast(data[i], data, precompute_in=precompute_in, precompute_out=precompute_out) # returns a value
-            else:
-                depth = band_depth_modified(i, data)  # returns a tuple of arrays (insersect_subset_ci and ci_subset_union), not a point
+        if modified:  # and not fast
+            depth = band_depth_modified(i, data, bands)  # returns a tuple of arrays (insersect_subset_ci and ci_subset_union), not a point
         else:
             if fast:
                 depth = band_depth_strict_fast(i, inclusion_mat)  # returns a value
             else:
-                depth = band_depth_strict(i, data)  # returns an array of containment relationships          
+                depth = band_depth_strict(i, data, bands=bands)  # returns an array of containment relationships          
                 depth = depth.mean()
         depths.append(depth)
 
-    if modified and not fast:
+    if modified: # and not fast
         depth_matrix_left = np.array([a[0] for a in depths])
         depth_matrix_right = np.array([a[1] for a in depths])
 
@@ -111,10 +104,9 @@ def compute_depths(data,
     return np.array(depths, dtype=float)
 
 
-def band_depth_strict(contour_index, data):
+def compute_band_info(data):
     num_contours = len(data)
-    in_ci = data[contour_index]
-    in_band = []
+    bands = []
     for i in range(num_contours):
         band_a = data[i]
         for j in range(i, num_contours):
@@ -122,15 +114,30 @@ def band_depth_strict(contour_index, data):
             if i != j:
                 subset_sum = band_a + band_b
 
-                union = (subset_sum > 0).astype(float)
-                intersection = (subset_sum == 2).astype(float)
+                band = dict()
+                band["union"] = (subset_sum > 0).astype(float)
+                band["intersection"] = (subset_sum == 2).astype(float)
+                bands.append(band)
+    return bands
 
-                intersect_in_contour = np.all(((intersection + in_ci) == 2).astype(float) == intersection)
-                contour_in_union = np.all(((union + in_ci) == 2).astype(float) == in_ci)
-                if intersect_in_contour and contour_in_union:
-                    in_band.append(1)
-                else:
-                    in_band.append(0)
+
+def band_depth_strict(contour_index, data, bands=None):
+    num_contours = len(data)
+    in_ci = data[contour_index]
+    in_band = []
+    if bands is None:
+        bands = compute_band_info(data)
+
+    for band in bands:
+        union = band["union"]
+        intersection = band["intersection"]
+
+        intersect_in_contour = np.all(((intersection + in_ci) == 2).astype(float) == intersection)
+        contour_in_union = np.all(((union + in_ci) == 2).astype(float) == in_ci)
+        if intersect_in_contour and contour_in_union:
+            in_band.append(1)
+        else:
+            in_band.append(0)
 
     return np.array(in_band)
 
@@ -144,7 +151,7 @@ def band_depth_strict_fast(contour_index, inclusion_mat):
     return (in_count*out_count + num_contours - 1)/num_subsets
 
 
-def band_depth_modified(contour_index, data):
+def band_depth_modified(contour_index, data, bands=None):
 
     num_contours = len(data)
     in_ci = data[contour_index]
@@ -153,27 +160,23 @@ def band_depth_modified(contour_index, data):
     intersect_subset_ci = []
     ci_subset_union = []
 
-    for i in range(num_contours):
-        band_a = data[i]
-        for j in range(i, num_contours):
-            band_b = data[j]
+    if bands is None:
+        bands = compute_band_info(data)
 
-            if i != j:
-                subset_sum = band_a + band_b
+    for band in bands:
+        union = band["union"]
+        intersection = band["intersection"]
 
-                union = (subset_sum > 0).astype(float)
-                intersection = (subset_sum == 2).astype(float)
-        
-                lc_frac = (intersection - in_ci)
-                lc_frac = (lc_frac > 0).sum()
-                lc_frac = lc_frac / (intersection.sum() + np.finfo(float).eps)
+        lc_frac = (intersection - in_ci)
+        lc_frac = (lc_frac > 0).sum()
+        lc_frac = lc_frac / (intersection.sum() + np.finfo(float).eps)
 
-                rc_frac = (in_ci - union)
-                rc_frac = (rc_frac > 0).sum()
-                rc_frac = rc_frac / (in_ci.sum() + np.finfo(float).eps)
+        rc_frac = (in_ci - union)
+        rc_frac = (rc_frac > 0).sum()
+        rc_frac = rc_frac / (in_ci.sum() + np.finfo(float).eps)
 
-                intersect_subset_ci.append(lc_frac)
-                ci_subset_union.append(rc_frac)
+        intersect_subset_ci.append(lc_frac)
+        ci_subset_union.append(rc_frac)
 
     return intersect_subset_ci, ci_subset_union
 
@@ -226,6 +229,7 @@ def band_depth_modified_fast(in_ci, masks, precompute_in=None, precompute_out=No
 
     # return (IN_in * IN_out + num_contours - 1)/(2*num_subsets)
     return (IN_in * IN_out)/(2*num_subsets)
+
 
 
 

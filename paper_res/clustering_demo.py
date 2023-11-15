@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.data.synthetic_data import magnitude_modes, three_rings, shape_families
+from contour_depth.data.synthetic_data import magnitude_modes, three_rings, shape_families, main_shape_with_outliers
 from contour_depth.utils import get_masks_matrix, get_sdfs
 from contour_depth.clustering.ddclust import compute_sil, compute_red, compute_cost, compute_red_within, compute_red_between
 
@@ -18,22 +18,23 @@ from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_
 
 data_seed = 0
 clustering_seed = 0
-init_seed = 0
+init_seed = 2
 
 ################
 # Data loading #
 ################
 
-num_contours = 200
+num_contours = 100
 # masks, labs = magnitude_modes(num_contours, 521, 512, return_labels=True, seed=data_seed)
 masks, labs = three_rings(num_contours, 512, 512, return_labels=True, seed=data_seed)
 # masks, labs = shape_families(num_contours, 512, 512, return_labels=True, seed=data_seed)
+# masks, labs = main_shape_with_outliers(num_contours, 512, 512, p_contamination=0.5, return_labels=True, seed=data_seed)
 labs = np.array(labs)
 num_clusters = np.unique(labs).size
 
 # precompute matrix
 
-sdfs = get_sdfs(masks)
+# sdfs = get_sdfs(masks)
 # sdfs_mat = get_masks_matrix(sdfs)
 # masks_mat = get_masks_matrix(masks)
 
@@ -52,13 +53,13 @@ general_clustering_kwargs = dict(
     beta_mult = 2,
     no_prog_its = 5,
     max_iter=200,
-    cost_threshold=0, 
+    cost_threshold=0.0, 
     swap_subset_max_size=5,
     # competing_cluster_method=["sil", "red", "inclusion_rel"][2],
     depth_notion = ["id", "cbd"][0],
     seed = clustering_seed,
     output_extra_info=True,
-    verbose=False
+    verbose=True
 )
 
 init_labs = initial_clustering(masks, num_components=num_clusters, feat_mat=None, pre_pca=False, method="random", seed=init_seed)
@@ -71,7 +72,6 @@ strict_clustering_kwargs["use_fast"] = False
 t_start = time()
 strict_labs, _ = cdclust(masks, init_labs, **strict_clustering_kwargs)
 print(f"Finished cdclust (strict id) in {time() - t_start} seconds")
-print()
 
 epsilon_clustering_kwargs = general_clustering_kwargs
 epsilon_clustering_kwargs["use_modified"] = True
@@ -81,7 +81,6 @@ epsilon_clustering_kwargs["use_fast"] = False
 t_start = time()
 epsilon_labs, _ = cdclust(masks, init_labs, **epsilon_clustering_kwargs)
 print(f"Finished cdclust (modified id) in {time() - t_start} seconds")
-print()
 
 ##########
 # Figure #
@@ -128,11 +127,11 @@ axs[0, 0].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, init_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 0].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=init_labs, ax=axs[1, 0])
+plot_red(red_w, red_b, compute_red=True, labs=init_labs, ax=axs[1, 0])
 
 red_i, red_w, red_b = get_depth_data(masks, init_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 0].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=init_labs, ax=axs[2, 0])
+plot_red(red_w, red_b, compute_red=True, labs=init_labs, ax=axs[2, 0])
 
 
 axs[0, 1].set_title("Target labels")
@@ -141,11 +140,11 @@ axs[0, 1].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 1].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=labs, ax=axs[1, 1])
+plot_red(red_w, red_b, compute_red=True, labs=labs, ax=axs[1, 1])
 
 red_i, red_w, red_b = get_depth_data(masks, labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 1].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=labs, ax=axs[2, 1])
+plot_red(red_w, red_b, compute_red=True, labs=labs, ax=axs[2, 1])
 
 
 axs[0, 2].set_title("ddclust (ID)")
@@ -154,12 +153,12 @@ axs[0, 2].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, strict_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 2].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=strict_labs, ax=axs[1, 2])
+plot_red(red_w, red_b, compute_red=True, labs=strict_labs, ax=axs[1, 2])
 axs[1, 2].axhline(y=general_clustering_kwargs["cost_threshold"], c="green")
 
 red_i, red_w, red_b = get_depth_data(masks, strict_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 2].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=strict_labs, ax=axs[2, 2])
+plot_red(red_w, red_b, compute_red=True, labs=strict_labs, ax=axs[2, 2])
 
 
 axs[0, 3].set_title("ddclust (eID)")
@@ -168,11 +167,11 @@ axs[0, 3].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, epsilon_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 3].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=epsilon_labs, ax=axs[1, 3])
+plot_red(red_w, red_b, compute_red=True, labs=epsilon_labs, ax=axs[1, 3])
 
 red_i, red_w, red_b = get_depth_data(masks, epsilon_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 3].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, plot_red=True, labs=epsilon_labs, ax=axs[2, 3])
+plot_red(red_w, red_b, compute_red=True, labs=epsilon_labs, ax=axs[2, 3])
 axs[2, 3].axhline(y=general_clustering_kwargs["cost_threshold"], c="green")
 
 

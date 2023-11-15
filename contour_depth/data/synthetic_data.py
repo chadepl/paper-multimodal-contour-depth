@@ -1,6 +1,8 @@
 
 import numpy as np
+from scipy.spatial.distance import cdist
 from skimage.draw import ellipse
+from skimage.draw import polygon2mask
 
 ############
 # Unimodal #
@@ -28,6 +30,74 @@ def circle_ensemble(num_masks, num_rows, num_cols, center_mean=(0.5, 0.5), cente
         masks.append(mask)
 
     return masks
+
+
+def get_base_gp(num_masks, domain_points, scale=0.01, sigma=1.0, seed=None):
+    if seed is None:
+        rng = np.random.default_rng()
+    else:
+        rng = np.random.default_rng(seed)
+
+    thetas = domain_points.flatten().reshape(-1, 1)
+    num_vertices = thetas.size
+    gp_mean = np.zeros(num_vertices)
+
+    gp_cov_sin = scale * np.exp(-(1 / (2 * sigma)) * cdist(np.sin(thetas), np.sin(thetas), "sqeuclidean"))
+    gp_sample_sin = rng.multivariate_normal(gp_mean, gp_cov_sin, num_masks)
+    gp_cov_cos = scale * np.exp(-(1 / (2 * sigma)) * cdist(np.cos(thetas), np.cos(thetas), "sqeuclidean"))
+    gp_sample_cos = rng.multivariate_normal(gp_mean, gp_cov_cos, num_masks)
+
+    return gp_sample_sin + gp_sample_cos
+
+def get_xy_coords(angles, radii):
+    num_members = radii.shape[0]
+    angles = angles.flatten().reshape(1,- 1).repeat(num_members, axis=0)
+    x = radii * np.cos(angles)
+    y = radii * np.sin(angles)
+    return x, y
+
+def rasterize_coords(x_coords, y_coords, num_rows, num_cols):    
+    masks = []
+    for xc, yc in zip(x_coords, y_coords):
+        coords_arr = np.concatenate([xc.reshape(-1,1), yc.reshape(-1,1)], axis=1)
+        coords_arr *= num_rows//2
+        coords_arr += num_cols//2
+        mask = polygon2mask((num_rows, num_cols), coords_arr).astype(float)
+        masks.append(mask)
+    return masks
+
+def main_shape_with_outliers(num_masks, num_rows, num_cols, num_vertices=100, p_contamination=0.1, return_labels=False, seed=None):
+
+    if seed is None:
+        rng = np.random.default_rng()
+    else:
+        rng = np.random.default_rng(seed)
+        
+    population_radius=0.5
+    normal_scale=0.003
+    normal_freq=0.9
+    outlier_scale=0.009
+    outlier_freq=0.04                                  
+    
+    thetas = np.linspace(0, 2 * np.pi, num_vertices)
+    population_radius = np.ones_like(thetas) * population_radius  # if we want constant radius (for a circle)
+    gp_sample_normal = get_base_gp(num_masks, thetas, scale=normal_scale, sigma=normal_freq)
+    gp_sample_outliers = get_base_gp(num_masks, thetas, scale=outlier_scale, sigma=outlier_freq)
+
+    should_contaminate = (rng.random(num_masks) > (1 - p_contamination)).astype(float)
+    should_contaminate = should_contaminate.reshape(num_masks,-1).repeat(num_vertices, axis=1)
+
+    radii = population_radius + (gp_sample_normal * (1 - should_contaminate)) + (gp_sample_outliers * should_contaminate)
+
+    xs, ys = get_xy_coords(thetas, radii)
+    contours = rasterize_coords(xs, ys, num_rows, num_cols)
+
+    labels = should_contaminate[:, 0].astype(int)
+
+    if return_labels:
+        return contours, labels
+    else:
+        return contours
 
 ##############
 # Multimodal #

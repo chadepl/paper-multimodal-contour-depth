@@ -25,7 +25,7 @@ def compute_depths(data,
 
     Parameters
     ----------
-    data : _type_
+    data : list
         List of contours to calculate the ID from. A contour is assumed to be
         represented as a binary mask with ones denoting inside and zeros outside
         regions.
@@ -35,9 +35,11 @@ def compute_depths(data,
         cross over a lot, by default False.
     fast : bool, optional
         Whether to use the fast implementation, by default False.
-    inclusion_mat : _type_, optional
+    inclusion_mat : ndarray, optional
         Square (N x N) numpy array with the inclusion relationships between 
         contours, by default None.
+    verbose: bool
+        Whether to print status messages to the console.
 
     Returns
     -------
@@ -47,6 +49,9 @@ def compute_depths(data,
     
     num_contours = len(data)
 
+    if not modified and fast:
+        raise NotImplementedError("ID not available for modified=False and fast=True")
+
     # Precomputed masks for modified versions
     if modified and fast:
         if precompute_in is None:
@@ -54,7 +59,7 @@ def compute_depths(data,
         if precompute_out is None:
             precompute_out = get_precompute_out(data)
 
-    if inclusion_mat is None:
+    if inclusion_mat is None and not fast:
         if verbose:
             print("Warning: pre-computed inclusion matrix not available, computing it ... ")
         if modified:            
@@ -62,13 +67,6 @@ def compute_depths(data,
         else:
             inclusion_mat = compute_inclusion_matrix(data)
 
-    # if not modified and fast:
-    #     print("Warning: the fast version is based on a paper that potentially has an error")
-    #     depths = inclusion_depth_strict_fast(data)
-    # else:
-    if not modified and fast:
-        if verbose:
-            print("Warning: for ID no faster version than O(N2) available, ")
     depths = []
     for i in range(num_contours):
         if modified:
