@@ -120,10 +120,85 @@ def spaghetti_plot(masks, iso_value, under_mask=None, arr=None, is_arr_categoric
 # DEPTH #
 ##############
 
-def plot_contour_boxplot(masks, depths,
-                         outlier_type="tail", epsilon_out=3, show_out=True,
-                         under_mask=None,
-                         smooth_line=True, axis_off=True,
+def get_bp_depth_elements(masks, depths, labs=None, outlier_type="tail", epsilon_out=3) -> dict:
+    # returns per cluster: representatives, bands and outliers
+
+    depths = np.array(depths).flatten()
+    if labs is None:
+        labs = [0 for _ in range(depths.size)]
+    labs = np.array(labs)
+    clusters_ids = np.unique(labs)
+
+    cluster_statistics = dict()    
+
+    for cluster_id in clusters_ids:
+        cluster_statistics[cluster_id] = dict()
+
+        coords = np.where(labs == cluster_id)[0]
+        subset_depths = depths[coords]
+
+        # representatives        
+        median_id = np.argmax(subset_depths)
+        median_coord = coords[median_id]
+        median_mask = masks[median_coord]
+        cluster_statistics[cluster_id]["representatives"] = dict(idx=[median_coord, ], masks=[median_mask, ])
+        
+        # outliers
+        if outlier_type == "threshold":
+            outliers_idx = np.where(subset_depths <= epsilon_out)[0]  # should be 0
+        elif outlier_type == "tail":
+            outliers_idx = np.argsort(subset_depths)[:int(epsilon_out)]  # should be 0
+        outliers_coords = [coords[oid] for oid in outliers_idx]
+        cluster_statistics[cluster_id]["outliers"] = dict(idx=[], masks=[])
+        for ocoord in outliers_coords:
+            cluster_statistics[cluster_id]["outliers"]["idx"].append(ocoord)
+            cluster_statistics[cluster_id]["outliers"]["masks"].append(masks[ocoord])
+
+        # bands
+
+        sorted_depths_idx = np.argsort(subset_depths)[::-1]
+        band100_idx = sorted_depths_idx[~np.in1d(sorted_depths_idx, outliers_idx)]
+        band50_idx = band100_idx[:band100_idx.size // 4]        
+
+        band100_coords = [coords[bid] for bid in band100_idx]
+        band50_coords = [coords[bid] for bid in band50_idx]
+
+        if len(band100_coords) >= 2:
+            band100_mask = np.array([masks[bcoord] for bcoord in band100_coords]).sum(axis=0)
+            band100_mask[band100_mask == len(band100_coords)] = 0
+            band100_mask[band100_mask > 0] = 1
+        else:
+            band100_mask = None
+
+        if len(band50_coords) >= 2:
+            band50_mask = np.array([masks[bcoord] for bcoord in band50_coords]).sum(axis=0)
+            band50_mask[band50_mask == len(band50_coords)] = 0
+            band50_mask[band50_mask > 0] = 1
+        else:
+            band50_mask = None
+
+        cluster_statistics[cluster_id]["bands"] = dict(idx=["b100", "b50"], masks=[band100_mask, band50_mask], weights=[100, 50])
+        
+
+        # trimmed mean
+        # masks_arr = np.array([m.flatten() for m in [masks[i] for i in cbp_band100]])
+        # masks_mean = masks_arr.mean(axis=0)
+        # contours = find_contours(masks_mean.reshape(masks[0].shape), level=0.5)
+        # plot_contour(contours, line_kwargs=dict(c="dodgerblue", linewidth=5), smooth_line=smooth_line, ax=ax)
+
+    return cluster_statistics
+
+
+def get_bp_cvp_elements():
+    pass
+    # per cluster representatives
+    # bands
+    # outliers
+
+def plot_contour_boxplot(masks, labs, method="depth", method_kwargs=dict(),
+                         focus_clusters=None,
+                         show_out=True, under_mask=None,
+                         smooth_line=False, axis_off=True,
                          ax=None):
     """
     Renders a contour boxplot using depth data and the provided masks.
@@ -132,72 +207,83 @@ def plot_contour_boxplot(masks, depths,
     TODO: implement automatic ways of determining epsilon_th and epsilon_out and set them as default
     """
 
-    depths = np.array(depths).flatten()
+    import matplotlib
 
-    # - classification
-    cbp_median = np.array([np.argmax(depths), ])
-    if outlier_type == "threshold":
-        cbp_outliers = np.where(depths <= epsilon_out)[0]  # should be 0
-    elif outlier_type == "tail":
-        cbp_outliers = np.argsort(depths)[:int(epsilon_out)]  # should be 0
-    sorted_depths = np.argsort(depths)[::-1]
-    cbp_band100 = sorted_depths[~np.in1d(sorted_depths, cbp_outliers)]
-    cbp_band50 = cbp_band100[:cbp_band100.size // 2]
+    num_contours = len(masks)
+    masks_shape = masks[0].shape  # r, c
+    if labs is None:
+        labs = [0 for _ in range(len(masks))]
+    labs = np.array(labs)
 
-    cbp_bands = np.setdiff1d(np.arange(depths.size), np.union1d(cbp_outliers, cbp_median))
+    clusters_ids = np.unique(labs)
+    num_contours_cluster = [np.where(labs == cluster_id)[0].size for cluster_id in clusters_ids]
+    if method == "depth":
+        cluster_statistics = get_bp_depth_elements(masks, labs=labs, **method_kwargs)
 
-    cbp_classification = np.zeros_like(depths)
-    cbp_classification[cbp_median] = 0
-    cbp_classification[cbp_bands] = 1
-    cbp_classification[cbp_outliers] = 2
+    if focus_clusters is None:
+        focus_clusters = clusters_ids.tolist()
+    focus_clusters = np.array(focus_clusters)
 
     # Plotting
     if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 10), layout="tight")
+        fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
     if axis_off:
         ax.set_axis_off()
 
     if under_mask is None:
-        under_mask_alpha = np.ones(list(masks[0].shape) + [3, ])
+        under_mask_alpha = np.ones(list(masks_shape) + [3, ])
         under_mask = (under_mask_alpha * 255).astype(int)
         ax.imshow(under_mask, alpha=under_mask_alpha[0])
     else:
         ax.imshow(under_mask, cmap="gray")
 
-    # Visual encoding
-    if len(cbp_band50 >= 2):
-        b50 = get_band_components(masks, cbp_band50)["band"]
-    if len(cbp_band100 >= 2):
-        b100 = get_band_components(masks, cbp_band100)["band"]
+    for cluster_id in focus_clusters:
+        cluster_color = colors[cluster_id] # plum, purple, yellow, red and teal where used before        
 
-    if show_out:
-        for outlier_id in cbp_outliers:
-            contours = find_contours(masks[outlier_id])
-            plot_contour(contours, line_kwargs=dict(c="red", linestyle="dashed", linewidth=1, alpha=0.8),
-                         smooth_line=smooth_line, ax=ax)
+        median_color = cluster_color
+        outliers_color = cluster_color
+        bands_color = cluster_color        
 
-    if len(cbp_band100 >= 2):
-        contours = find_contours(b100)
-        plot_contour(contours, line_kwargs=dict(c="purple", linewidth=2), smooth_line=smooth_line, ax=ax)
-        c = plt.cm.get_cmap("Purples")(b100)
-        c[:, :, -1] = b100 * 0.1
-        ax.imshow(c, cmap="Purples")
+        if show_out and "outliers" in cluster_statistics[cluster_id]:
+            cluster_outliers = cluster_statistics[cluster_id]["outliers"]
+            for outlier_id, outlier_mask in zip(cluster_outliers["idx"], cluster_outliers["masks"]):
+                plot_contour(outlier_mask, line_kwargs=dict(c=outliers_color, linestyle="dashed", linewidth=1, alpha=0.8),
+                            smooth_line=smooth_line, ax=ax)
+        
+        if "bands" in cluster_statistics[cluster_id]:
+            cluster_bands = cluster_statistics[cluster_id]["bands"]
 
-    if len(cbp_band50 >= 2):
-        contours = find_contours(b50)
-        plot_contour(contours, line_kwargs=dict(c="plum", linewidth=2), smooth_line=smooth_line, ax=ax)
-        c = plt.cm.get_cmap("Purples")(b50)
-        c[:, :, -1] = b50 * 0.1
-        ax.imshow(c, alpha=b50, cmap="Purples")
+            for i, (bid, bmask, bweight) in enumerate(zip(cluster_bands["idx"], cluster_bands["masks"], cluster_bands["weights"])):                                
+                cluster_bands_color_hex = bands_color.lstrip("#")
+                cluster_bands_color = list(int(cluster_bands_color_hex[i:i+2], 16) for i in (0, 2, 4)) 
+                cluster_bands_color += [int(255 * (bweight/100) * 0.3), ] # full opacity        
+                bcolmat = np.array(cluster_bands_color).reshape((1, 1, 4))
+                bcolmat = np.repeat(bcolmat, repeats=masks_shape[0], axis=(0))
+                bcolmat = np.repeat(bcolmat, repeats=masks_shape[1], axis=(1))
+                zero_mask = np.where(bmask == 0)
+                bcolmat[zero_mask[0], zero_mask[1], -1] = 0  # set alpha to zero if not in mask
+                ax.imshow(bcolmat)#, cmap=["Purples", "Greens"][cluster_id])
 
-    contours = find_contours(masks[cbp_median[0]])
-    plot_contour(contours, line_kwargs=dict(c="yellow", linewidth=5), smooth_line=smooth_line, ax=ax)
+                # plot_contour(bmask, line_kwargs=dict(c=bands_color, linewidth=1), smooth_line=smooth_line, ax=ax)
 
-    # trimmed mean
-    masks_arr = np.array([m.flatten() for m in [masks[i] for i in cbp_band100]])
-    masks_mean = masks_arr.mean(axis=0)
-    contours = find_contours(masks_mean.reshape(masks[0].shape), level=0.5)
-    plot_contour(contours, line_kwargs=dict(c="dodgerblue", linewidth=5), smooth_line=smooth_line, ax=ax)
+        if "representatives" in cluster_statistics[cluster_id]:
+            median_mask = cluster_statistics[cluster_id]["representatives"]["masks"][0]
+            plot_contour(median_mask, line_kwargs=dict(c=median_color, linewidth=3), smooth_line=smooth_line, ax=ax)
+
+    # Add legend bar    
+    from matplotlib.patches import Rectangle
+    RECT_WIDTH = 5
+    PADDING_LR = 1
+    PADDING_TB = 2
+    start = PADDING_TB//2
+    for cluster_id in clusters_ids:
+        cluster_color = colors[cluster_id]
+        if cluster_id not in focus_clusters:
+            cluster_color = "lightgray"
+        rect_height = masks_shape[0]*(num_contours_cluster[cluster_id]/num_contours) - PADDING_TB//2
+        rect = Rectangle((masks_shape[1]-RECT_WIDTH - PADDING_LR, start), RECT_WIDTH, rect_height, color=cluster_color)
+        ax.add_patch(rect)
+        start += rect_height
 
     return ax
 
