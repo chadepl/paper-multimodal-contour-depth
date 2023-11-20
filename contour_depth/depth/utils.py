@@ -9,28 +9,13 @@ def compute_inclusion_matrix(masks):
     masks : _type_
         _description_
     """
-    masks = [m.copy().astype(int) for m in masks]  # ensure masks are int
     num_masks = len(masks)
+    masks = np.array(masks).astype(int)
     inclusion_mat = np.zeros((num_masks, num_masks))
-
     for i in range(num_masks):
-        inclusion = compute_inclusion(i, masks)
-        inclusion_mat[i, :] = inclusion
-
+        inclusion_mat[i, :] = np.all((masks & masks[i]) == masks[i], axis=(1, 2))
+        inclusion_mat[i, i] = 0
     return inclusion_mat
-
-
-def compute_inclusion(contour_index, masks):
-    num_masks = len(masks)
-    inclusion = np.zeros(num_masks)
-    for j in range(num_masks):
-        if contour_index != j:
-            intersect = ((masks[contour_index] + masks[j]) == 2).astype(float)
-            is_in = np.all(masks[contour_index] == intersect)
-            is_out = np.all(masks[j] == intersect)
-            if is_in:
-                inclusion[j] = 1
-    return inclusion
 
 
 def compute_epsilon_inclusion_matrix(masks):
@@ -42,29 +27,11 @@ def compute_epsilon_inclusion_matrix(masks):
     masks : _type_
         _description_
     """
-    masks = [m.copy().astype(int) for m in masks]  # ensure masks are int
     num_masks = len(masks)
+    masks = np.array(masks).astype(int)
     inclusion_mat = np.zeros((num_masks, num_masks))
-
+    inv_masks = 1 - masks
     for i in range(num_masks):
-        inclusion = compute_epsilon_inclusion(i, masks)
-        inclusion_mat[i, :] = inclusion
-
+        inclusion_mat[i, :] = 1 - np.sum(inv_masks & masks[i], axis=(1, 2)) / np.sum(masks[i])
+        inclusion_mat[i, i] = 0
     return inclusion_mat
-
-
-def compute_epsilon_inclusion(contour_index, masks):
-    num_masks = len(masks)
-    inclusion = np.zeros(num_masks)
-    for j in range(num_masks):
-        in_cj = masks[j].astype(float)
-        if contour_index != j:
-            in_ci = masks[contour_index].astype(float)
-
-            eps_sub = (in_ci * (1 - in_cj)).sum()/in_ci.sum()
-            eps_sub = 1 - eps_sub
-
-            inclusion[j] = eps_sub
-
-    return inclusion
-
