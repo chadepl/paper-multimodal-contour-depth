@@ -14,7 +14,7 @@ from contour_depth.utils import get_masks_matrix, get_sdfs
 
 def cdclust(masks, init_labs, 
             beta_init = np.inf, beta_mult=2, no_prog_its=5, max_iter=100,
-            cost_threshold=0, swap_subset_max_size=5,
+            cost_threshold=0, swap_subset_max_size=5, sample_swap_size = True, check_cost_function=True,
             competing_cluster_method="red",
             depth_notion="id", use_modified=False, use_fast=True, output_extra_info=False, verbose=False, seed=42):
     
@@ -49,6 +49,8 @@ def cdclust(masks, init_labs,
     # - Setup inclusion matrix
     if use_modified and use_fast:
         assert depth_notion == "id"
+        inclusion_mat = None
+        epsilon_inclusion_mat = None
     else:
         epsilon_inclusion_mat = compute_epsilon_inclusion_matrix(masks)
         if not use_modified:
@@ -99,7 +101,10 @@ def cdclust(masks, init_labs,
         
         while working_subset.size > 0:
 
-            swap_subset_size = int(rng.integers(1, swap_subset_max_size, 1)[0])
+            if sample_swap_size:
+                swap_subset_size = int(rng.integers(1, swap_subset_max_size, 1)[0])
+            else:
+                swap_subset_size = swap_subset_max_size
             if swap_subset_size > working_subset.size:
                 swap_subset_size = working_subset.size
 
@@ -140,30 +145,38 @@ def cdclust(masks, init_labs,
 
                 # - Decide whether to accept or not the partition. Criteria to accept:
                 # -- if cost(new_partion) > cost(partition)
-                # -- if cost(new_partion) <= cost(partition) with Pr(beta, delta cost)            
+                # -- if cost(new_partion) <= cost(partition) with Pr(beta, delta cost) 
                 delta_cost = clustering_cost - new_clustering_cost
-                prob = np.exp(-beta * np.abs(delta_cost))            
-                if delta_cost <= 0:                
-                    num_its_no_prog = 0
-                    accept_clustering = True                      
+                prob = np.exp(-beta * np.abs(delta_cost)) 
+                with_annealing = False
+                if check_cost_function:                               
+                    if delta_cost <= 0:                
+                        num_its_no_prog = 0
+                        accept_clustering = True                      
+                    else:
+                        y = rng.uniform(0, 1, 1)                
+                        if y < prob:
+                            accept_clustering = True
+                            with_annealing = True
+                        else:                    
+                            num_its_no_prog += 1
+                            accept_clustering = False
                 else:
-                    y = rng.uniform(0, 1, 1)                
-                    if y < prob:
-                        accept_clustering = True
-                    else:                    
-                        num_its_no_prog += 1
-                        accept_clustering = False
+                    accept_clustering = True
 
                 if verbose:
                     print(accept_clustering, prob, clustering_cost, new_clustering_cost)
 
-            if accept_clustering:
+            if accept_clustering:                
                 pred_labs = new_pred_labs
                 red_i = new_red_i
                 competing_clusters = new_competing_clusters
                 clustering_cost = new_clustering_cost
                 precomputed_ins = new_precomputed_ins
                 precomputed_outs = new_precomputed_outs
+                if delta_cost <= 0 or with_annealing:
+                    best_labs = pred_labs
+                    best_red_i = red_i
                 if verbose:
                     print("Updated partition!")
             else:
@@ -197,8 +210,8 @@ def cdclust(masks, init_labs,
         print(f"cdclust ran for {total_its} iterations")
 
     if output_extra_info:
-        return pred_labs, red_i
-    return pred_labs
+        return best_labs, best_red_i
+    return best_labs
 
 
 def ddclust(masks, init_labs, 

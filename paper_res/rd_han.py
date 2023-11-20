@@ -26,7 +26,7 @@ if __name__ == "__main__":
     assert outputs_dir.exists()
 
     PATIENT_ID = "HCAI-036"
-    OAR, SLICE_NUM = [("BrainStem", 31), ("Parotid_R", 41)][0]
+    OAR, SLICE_NUM = [("BrainStem", 31), ("Parotid_R", 41)][1]
     VERSION = ["strict", "modified"][1]
 
     # Path to data
@@ -117,6 +117,8 @@ if __name__ == "__main__":
     # Figure band depths clustering #
     #################################  
 
+    from contour_depth.visualization import plot_contour_boxplot, get_bp_depth_elements
+
     best_k_id = np.argsort(k_eval[:, 1])[-1]
     best_k = int(k_eval[best_k_id, 0])
     best_k_val = k_eval[best_k_id, 1]
@@ -141,21 +143,22 @@ if __name__ == "__main__":
     max_depth_id = ag1[cluster_members[:10]].tolist()
     to_highlight = min_depth_id + max_depth_id
 
+    SMOOTH_ITS = 2
+    SMOOTH_K_SIZE = 1
+
     # - spaghetti
 
     fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
-    spaghetti_plot(masks, 0.5, img, arr=None, smooth_line=False, highlight=None, ax=ax)
-
+    spaghetti_plot(masks, 0.5, img, arr=None, smooth=True, smooth_its=SMOOTH_ITS, smooth_kernel_size=SMOOTH_K_SIZE, highlight=None, ax=ax)
     # plt.show()
 
     fig.savefig(outputs_dir.joinpath(f"{prefix}_spaghetti.png"), dpi=300)
 
-    from contour_depth.visualization import get_bp_depth_elements, plot_contour_boxplot
-    
     # - full depth
     fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
     depth_method_kwargs = dict(depths=full_dephts, outlier_type="tail", epsilon_out=3)
-    plot_contour_boxplot(masks, None, method="depth", method_kwargs=depth_method_kwargs, under_mask=img, ax=ax)
+    cluster_statistics = get_bp_depth_elements(masks, **depth_method_kwargs)
+    plot_contour_boxplot(masks, None, cluster_statistics=cluster_statistics, under_mask=img, smooth=True, smooth_its=SMOOTH_ITS, smooth_kernel_size=SMOOTH_K_SIZE, ax=ax)
     # plt.show()
 
     fig.savefig(outputs_dir.joinpath(f"{prefix}_boxplot_full-depth.png"), dpi=300)
@@ -163,17 +166,16 @@ if __name__ == "__main__":
     # - clusters
     fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
     depth_method_kwargs = dict(depths=red_i, outlier_type="tail", epsilon_out=7)
-    plot_contour_boxplot(masks, pred_labs, method="depth", method_kwargs=depth_method_kwargs, under_mask=img, ax=ax)
+    plot_contour_boxplot(masks, pred_labs, method="depth", method_kwargs=depth_method_kwargs, under_mask=img, smooth=True, smooth_its=SMOOTH_ITS, smooth_kernel_size=SMOOTH_K_SIZE, ax=ax)
     # plt.show()
 
     fig.savefig(outputs_dir.joinpath(f"{prefix}_boxplot_clusters.png"), dpi=300)
-
 
     # - clusters: focus
     for k in range(best_k):
         fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
         depth_method_kwargs = dict(depths=red_i, outlier_type="tail", epsilon_out=7)
-        plot_contour_boxplot(masks, pred_labs, method="depth", focus_clusters=[k,], method_kwargs=depth_method_kwargs, under_mask=img, ax=ax)
+        plot_contour_boxplot(masks, pred_labs, method="depth", focus_clusters=[k,], method_kwargs=depth_method_kwargs, under_mask=img, smooth=True, smooth_its=SMOOTH_ITS, smooth_kernel_size=SMOOTH_K_SIZE, ax=ax)
         # plt.show()
 
         fig.savefig(outputs_dir.joinpath(f"{prefix}_boxplot_clusters_focus-{k}.png"), dpi=300)

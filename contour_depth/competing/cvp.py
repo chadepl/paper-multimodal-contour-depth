@@ -77,13 +77,24 @@ def get_cvp_sdf_pca_transform(masks, threshold_explained_var=0.999, seed=None):
 
 def get_cvp_clustering(pca_mat, num_components):
     
-    ahc = AgglomerativeClustering(n_clusters=num_components, metric="euclidean", linkage="average").fit(pca_mat)
+    ahc = AgglomerativeClustering(n_clusters=num_components, 
+                                  metric="euclidean", linkage="average").fit(pca_mat)
     labs = ahc.labels_
 
     return labs
 
 
+def get_cvp_pca_medians(pca_mat, labs):
+    medians = []
+    for k in np.unique(labs):
+        pca_cluster_mat = pca_mat[np.where(labs == k)]
+        pca_median = geometric_median(pca_cluster_mat)
+        medians.append(pca_median)
+    return medians
+
+
 def transform_from_pca_to_sdf(pca_vectors, mean_sdf_vector, transform_mat):
+    # https://stackoverflow.com/questions/32750915/pca-inverse-transform-manually
     return mean_sdf_vector + np.matmul(pca_vectors, transform_mat)
 
 
@@ -94,16 +105,6 @@ def get_per_cluster_mean(mat, labs):
         mean = np.mean(cluster_mat, axis=0)
         means.append(mean)
     return means
-
-
-def get_cvp_pca_medians(pca_mat, labs, transform_mat):
-    medians = []
-    for k in np.unique(labs):
-        pca_cluster_mat = pca_mat[np.where(labs == k)]
-        pca_median = geometric_median(pca_cluster_mat)
-        medians.append(pca_median)
-    return medians
-
 
 def get_cvp_bands(sdf_mat, labs, std_mult=1):
     bands = []

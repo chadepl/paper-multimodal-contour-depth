@@ -18,8 +18,8 @@ def circle_ensemble(num_masks, num_rows, num_cols, center_mean=(0.5, 0.5), cente
     RADIUS_MEAN = np.minimum(num_rows, num_cols) * radius_mean  # radius is 25 percent of diameter
     RADIUS_STD = np.minimum(num_rows, num_cols) * radius_std
     radii = rng.normal(RADIUS_MEAN, RADIUS_STD, num_masks)
-    centers_rows = rng.normal(np.floor(num_rows*center_mean[0]), center_std[0], num_masks)
-    centers_cols = rng.normal(np.floor(num_cols*center_mean[1]), center_std[1], num_masks)
+    centers_rows = rng.normal(np.floor(num_rows*center_mean[0]), num_rows*center_std[0], num_masks)
+    centers_cols = rng.normal(np.floor(num_cols*center_mean[1]), num_cols*center_std[1], num_masks)
 
     # build ensemble
     masks = []
@@ -143,7 +143,7 @@ def magnitude_modes(num_masks, num_rows, num_cols,
 
 
 
-def three_rings(num_masks, num_rows, num_cols, modes_proportions=(0.5, 0.3, 0.2), return_labels=False, seed=None):
+def three_rings(num_masks, num_rows, num_cols, modes_proportions=(0.5, 0.3, 0.2), center_stds=(0.009, 0.01, 0.007), return_labels=False, seed=None):
     """
     Three circles with the x, y origin coordinates perturbed.
     This is the example used in the EnConVis paper.
@@ -153,19 +153,19 @@ def three_rings(num_masks, num_rows, num_cols, modes_proportions=(0.5, 0.3, 0.2)
     masks = []
     labs = []
     
-    mode_masks = circle_ensemble(modes_sizes[0], num_rows, num_cols, center_mean=(0.5 + 0.17, 0.5), center_std=(0, 0), radius_mean=0.19, radius_std=0.19*0.1, seed=seed)
+    mode_masks = circle_ensemble(modes_sizes[0], num_rows, num_cols, center_mean=(0.5 + 0.17, 0.5), center_std=(center_stds[0], center_stds[0]), radius_mean=0.19, radius_std=0.19*0.1, seed=seed)
     mode_labs = [0 for _ in range(modes_sizes[0])]
 
     masks += mode_masks
     labs += mode_labs
 
-    mode_masks = circle_ensemble(modes_sizes[1], num_rows, num_cols, center_mean=(0.5, 0.5 - 0.15), center_std=(0, 0), radius_mean=0.2, radius_std=0.2*0.1, seed=seed)
+    mode_masks = circle_ensemble(modes_sizes[1], num_rows, num_cols, center_mean=(0.5, 0.5 - 0.15), center_std=(center_stds[1], center_stds[1]), radius_mean=0.2, radius_std=0.2*0.1, seed=seed)
     mode_labs = [1 for _ in range(modes_sizes[1])]
 
     masks += mode_masks
     labs += mode_labs
 
-    mode_masks = circle_ensemble(modes_sizes[2], num_rows, num_cols, center_mean=(0.5, 0.5 + 0.15), center_std=(0, 0), radius_mean=0.18, radius_std=0.18*0.1, seed=seed)
+    mode_masks = circle_ensemble(modes_sizes[2], num_rows, num_cols, center_mean=(0.5, 0.5 + 0.15), center_std=(center_stds[2], center_stds[2]), radius_mean=0.18, radius_std=0.18*0.1, seed=seed)
     mode_labs = [2 for _ in range(modes_sizes[2])]
 
     masks += mode_masks

@@ -18,7 +18,7 @@ from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_
 
 data_seed = 0
 clustering_seed = 0
-init_seed = 2
+init_seed = 1
 
 ################
 # Data loading #
@@ -48,23 +48,42 @@ epsilon_inclusion_mat = compute_epsilon_inclusion_matrix(masks)
 # Input: data, labels (labels have been assigned by a method or randomly)
 # Input: number of clusters K
 
-general_clustering_kwargs = dict(
-    beta_init = 1,  # np.inf means no annealing
-    beta_mult = 2,
-    no_prog_its = 5,
-    max_iter=200,
-    cost_threshold=0.0, 
-    swap_subset_max_size=5,
+clustering_kwargs_kmeans = dict(
+    beta_init = np.inf, # np.inf means no annealing
+    beta_mult = 2, # will not have any effect
+    no_prog_its = 100,
+    max_iter = 200,
+    cost_threshold = 0.04, # includes every contour in the swapping 
+    swap_subset_max_size = num_contours, # all contours are tested
+    sample_swap_size = False,
+    check_cost_function=False,
     # competing_cluster_method=["sil", "red", "inclusion_rel"][2],
+       
+)
+
+clustering_kwargs_annealing = dict(
+    beta_init = 1,  # we do annealing
+    beta_mult = 2,
+    no_prog_its = 5, # reduce the amount of iterations without progress
+    max_iter=200,
+    cost_threshold=0,  # we only include contours with ReD below 0 in the swapping 
+    swap_subset_max_size=5, # mini-batch
+    sample_swap_size = True,
+    check_cost_function=True,
+    # competing_cluster_method=["sil", "red", "inclusion_rel"][2],
+)
+
+clustering_kwargs = clustering_kwargs_kmeans #clustering_kwargs_annealing
+clustering_kwargs.update(dict(
     depth_notion = ["id", "cbd"][0],
     seed = clustering_seed,
     output_extra_info=True,
-    verbose=True
-)
+    verbose=True))
+
 
 init_labs = initial_clustering(masks, num_components=num_clusters, feat_mat=None, pre_pca=False, method="random", seed=init_seed)
 
-strict_clustering_kwargs = general_clustering_kwargs
+strict_clustering_kwargs = clustering_kwargs
 strict_clustering_kwargs["use_modified"] = False
 strict_clustering_kwargs["use_fast"] = False
 
@@ -73,7 +92,7 @@ t_start = time()
 strict_labs, _ = cdclust(masks, init_labs, **strict_clustering_kwargs)
 print(f"Finished cdclust (strict id) in {time() - t_start} seconds")
 
-epsilon_clustering_kwargs = general_clustering_kwargs
+epsilon_clustering_kwargs = clustering_kwargs
 epsilon_clustering_kwargs["use_modified"] = True
 epsilon_clustering_kwargs["use_fast"] = False
 
@@ -154,7 +173,7 @@ axs[0, 2].set_axis_off()
 red_i, red_w, red_b = get_depth_data(masks, strict_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 2].set_title(f"ID: {red_i.mean():.4f}")
 plot_red(red_w, red_b, compute_red=True, labs=strict_labs, ax=axs[1, 2])
-axs[1, 2].axhline(y=general_clustering_kwargs["cost_threshold"], c="green")
+axs[1, 2].axhline(y=clustering_kwargs["cost_threshold"], c="green")
 
 red_i, red_w, red_b = get_depth_data(masks, strict_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 2].set_title(f"eID: {red_i.mean():.4f}")
@@ -172,7 +191,7 @@ plot_red(red_w, red_b, compute_red=True, labs=epsilon_labs, ax=axs[1, 3])
 red_i, red_w, red_b = get_depth_data(masks, epsilon_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 3].set_title(f"eID: {red_i.mean():.4f}")
 plot_red(red_w, red_b, compute_red=True, labs=epsilon_labs, ax=axs[2, 3])
-axs[2, 3].axhline(y=general_clustering_kwargs["cost_threshold"], c="green")
+axs[2, 3].axhline(y=clustering_kwargs["cost_threshold"], c="green")
 
 
 plt.show()
