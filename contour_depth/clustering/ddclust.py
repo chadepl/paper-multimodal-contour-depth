@@ -9,7 +9,7 @@ from contour_depth.depth.band_depth import compute_depths as band_depths
 from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
 from contour_depth.utils import get_masks_matrix, get_sdfs
 
-def kmeans_cluster_eid(masks, num_clusters, max_num_iterations=10):
+def kmeans_cluster_eid(masks, num_clusters, num_attempts=5, max_num_iterations=10):
     masks = np.array(masks, dtype=np.float32)
     neg_masks = 1 - masks
     areas = np.sum(masks, axis=(1, 2))
@@ -17,32 +17,40 @@ def kmeans_cluster_eid(masks, num_clusters, max_num_iterations=10):
 
     num_masks, height, width = masks.shape
     
-    cluster_assignment = np.random.randint(low=0, high=num_clusters, size=num_masks)
-    for _ in range(max_num_iterations):
-        precompute_in = np.empty((num_clusters, height, width), dtype=np.float32)
-        precompute_out = np.empty((num_clusters, height, width), dtype=np.float32)
-        
-        for c in range(num_clusters):
-            selected_masks = masks[cluster_assignment == c]
-            selected_areas = areas[cluster_assignment == c]
-            selected_inv_masks = neg_masks[cluster_assignment == c]
-
-            precompute_in[c] = np.sum(selected_inv_masks, axis=0)
-            precompute_out[c] = np.sum((selected_masks.T / selected_areas.T).T, axis=0)
-
-        depth_in_cluster = np.empty((num_clusters, num_masks), dtype=np.float32)
-        for c in range(num_clusters):
-            N = np.sum(cluster_assignment == c)
-            assert(N > 0)
-            IN_in = N - inv_areas * np.sum(masks * precompute_in[c], axis=(1,2))
-            IN_out = N - np.sum(neg_masks * precompute_out[c], axis=(1, 2))
-            depth_in_cluster[c] = np.minimum(IN_in, IN_out) / N
+    best_depth_sum = -np.inf
+    best_cluster_assignment = None
+    for _ in range(num_attempts):
+        cluster_assignment = np.random.randint(low=0, high=num_clusters, size=num_masks)
+        for _ in range(max_num_iterations):
+            precompute_in = np.empty((num_clusters, height, width), dtype=np.float32)
+            precompute_out = np.empty((num_clusters, height, width), dtype=np.float32)
             
-        old_cluster_assignment = cluster_assignment
-        cluster_assignment = np.argmax(depth_in_cluster, axis=0)
-        if np.all(cluster_assignment == old_cluster_assignment):
-            break
-    return cluster_assignment
+            for c in range(num_clusters):
+                selected_masks = masks[cluster_assignment == c]
+                selected_areas = areas[cluster_assignment == c]
+                selected_inv_masks = neg_masks[cluster_assignment == c]
+
+                precompute_in[c] = np.sum(selected_inv_masks, axis=0)
+                precompute_out[c] = np.sum((selected_masks.T / selected_areas.T).T, axis=0)
+
+            depth_in_cluster = np.empty((num_clusters, num_masks), dtype=np.float32)
+            for c in range(num_clusters):
+                N = np.sum(cluster_assignment == c)
+                assert(N > 0)
+                IN_in = N - inv_areas * np.sum(masks * precompute_in[c], axis=(1,2))
+                IN_out = N - np.sum(neg_masks * precompute_out[c], axis=(1, 2))
+                depth_in_cluster[c] = np.minimum(IN_in, IN_out) / N
+                
+            old_cluster_assignment = cluster_assignment
+            cluster_assignment = np.argmax(depth_in_cluster, axis=0)
+            depth_sum = np.sum(np.choose(cluster_assignment, depth_in_cluster))
+            if depth_sum > best_depth_sum:
+                best_cluster_assignment = cluster_assignment
+                best_depth_sum = depth_sum
+
+            if np.all(cluster_assignment == old_cluster_assignment):
+                break
+    return best_cluster_assignment
 
 
 # TODO: there is an error when one of the labels dissapears of the clustering, which might happen due to poor initialization
