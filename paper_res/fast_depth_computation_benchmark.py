@@ -34,28 +34,30 @@ if __name__ == "__main__":
                    fast=dict(fast=True, modified=True))
     )
 
-    seeds_data = [0, 1, 2, 3, 4]
+    seeds_data = [0, 1, 2, 3, 4]    
     N = 300  # fixed
     ROWS = COLS = 512  # fixed
     P_CONTAMINATION = 0.1  # fixed
-    METHOD = ["cbd", "id", "eid"][2]
+    METHOD = ["cbd", "id", "eid"][0]
 
     ###################
     # Data generation #
     ###################
 
-    path_df = outputs_dir.joinpath(f"{METHOD}_timings.csv")
-    if path_df.exists():
-        df = pd.read_csv(path_df, index_col=0)
-    else:
-        # depth computation
-        rows = [["seed_data", "sample_size", "method_id", "t_slow_secs", "t_fast_secs", "mse"]]
-        for seed_data in seeds_data:
-            rng = np.random.default_rng(seed_data)
-            # build ensemble
-            masks, labs = main_shape_with_outliers(N, ROWS, COLS, 
-                                                   p_contamination=P_CONTAMINATION, 
-                                                   return_labels=True, seed=seed_data)
+    for seed_data in seeds_data:
+        rng = np.random.default_rng(seed_data)
+        # build ensemble
+        masks, labs = main_shape_with_outliers(N, ROWS, COLS, 
+                                                p_contamination=P_CONTAMINATION, 
+                                                return_labels=True, seed=seed_data)
+
+        path_df = outputs_dir.joinpath(f"{METHOD}_seed{seed_data}_timings.csv")
+        if path_df.exists():
+            print("df already exists ...")
+        else:
+            # depth computation
+            rows = [["seed_data", "sample_size", "method_id", "t_slow_secs", "t_fast_secs", "mse"]]
+            
             sample_idx = np.arange(N)
 
             for sample_size in np.arange(10, N + 1, 10)[::-1]:
@@ -94,9 +96,9 @@ if __name__ == "__main__":
                 else:
                     print(f"- METHOD was cbd, sample size {sample_size} is too large, skipping it ...")
             
-        df = pd.DataFrame(rows[1:])
-        df.columns = rows[0]
-        df.to_csv(path_df)  # write to csv
+            df = pd.DataFrame(rows[1:])
+            df.columns = rows[0]
+            df.to_csv(path_df)  # write to csv
     
     print(df.head())
     print()
@@ -105,39 +107,52 @@ if __name__ == "__main__":
     # Analysis #
     ############
 
-    # import seaborn as sns
+    import seaborn as sns
 
-    # timings_df = df
-    # timings_df = timings_df.drop("mse", axis=1)
-    # timings_df = timings_df.melt(["seed_data", "sample_size", "method_id"], ["t_slow_secs", "t_fast_secs"], "version_id", "time")
+    seeds_data = [0, 1, 2, 3, 4]    
+    METHOD = ["cbd", "id", "eid"]
+
+    dfs = []
+    for p in outputs_dir.glob("*timings*"):
+        dfs.append(pd.read_csv(p))
+
+    df = pd.concat(dfs, axis=0)
+
+    print(df.head())
+
+
+    timings_df = df
+    timings_df = timings_df.drop("mse", axis=1)
+    timings_df = timings_df.melt(["seed_data", "sample_size", "method_id"], ["t_slow_secs", "t_fast_secs"], "version_id", "time")
     
-    # timings_df["version_id"] = timings_df["version_id"].apply(lambda d: "No" if d == "t_slow_secs" else "Yes") 
-    # timings_df["method_id"] = timings_df["method_id"].apply(lambda d: dict(cbd="CBD", id="ID", eid="eID")[d]) 
-    # timings_df = timings_df.rename(lambda d: dict(method_id="Method", version_id="Optimized")[d] if d in ["method_id", "version_id"] else d, axis=1)
+    timings_df = timings_df.loc[np.negative(np.logical_and(timings_df.method_id=="id", timings_df.version_id=="t_fast_secs")),:]
+    timings_df["version_id"] = timings_df["version_id"].apply(lambda d: "No" if d == "t_slow_secs" else "Yes") 
+    timings_df["method_id"] = timings_df["method_id"].apply(lambda d: dict(cbd="CBD", id="ID", eid="eID")[d]) 
+    timings_df = timings_df.rename(lambda d: dict(method_id="Method", version_id="Optimized")[d] if d in ["method_id", "version_id"] else d, axis=1)
 
 
-    # sns.set_palette("colorblind")
-    # fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
+    sns.set_palette("colorblind")
+    fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
 
-    # sns_plt = sns.lineplot(timings_df, 
-    #                        x="sample_size", y="time", 
-    #                        hue="Method", style="Optimized", 
-    #                        linewidth=2, ax=ax)
+    sns_plt = sns.lineplot(timings_df, 
+                           x="sample_size", y="time", 
+                           hue="Method", style="Optimized", 
+                           linewidth=2, ax=ax)
 
-    # # sns_plt.set(xscale="log", yscale="log")
-    # sns_plt.set(yscale="log")
-    # ax.set_title("Runtimes vs Ensemble Size for \n Contour Band Depth and Inclusion Depth ")
-    # ax.set_ylabel("Log(Time (seconds))")
-    # ax.set_xlabel("Size")
+    # sns_plt.set(xscale="log", yscale="log")
+    sns_plt.set(yscale="log")
+    ax.set_title("Runtimes vs Ensemble Size for \n Contour Band Depth and Inclusion Depth ")
+    ax.set_ylabel("Log(Time (seconds))")
+    ax.set_xlabel("Size")
     
+    plt.show()
+
+    fig.savefig(outputs_dir.joinpath("speed_gains.svg"), dpi=300)
+
+    # cm = plt.colormaps.get_cmap("magma")
+    # fig, axs = plt.subplots(ncols=2)
+    # for d, m in zip(depths_slow, masks):
+    #     axs[0].contour(m, colors=[cm(d),], linewidths=[0.5, ], alpha=0.2)
+    # for d, m in zip(depths_fast, masks):
+    #     axs[1].contour(m, colors=[cm(d),], linewidths=[0.5, ], alpha=0.2)
     # plt.show()
-
-    # fig.savefig(outputs_dir.joinpath("speed_gains.png"), dpi=300)
-
-        # cm = plt.colormaps.get_cmap("magma")
-        # fig, axs = plt.subplots(ncols=2)
-        # for d, m in zip(depths_slow, masks):
-        #     axs[0].contour(m, colors=[cm(d),], linewidths=[0.5, ], alpha=0.2)
-        # for d, m in zip(depths_fast, masks):
-        #     axs[1].contour(m, colors=[cm(d),], linewidths=[0.5, ], alpha=0.2)
-        # plt.show()
