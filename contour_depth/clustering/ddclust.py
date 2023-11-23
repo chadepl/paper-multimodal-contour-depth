@@ -10,7 +10,7 @@ from contour_depth.depth.band_depth import compute_depths as band_depths
 from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
 from contour_depth.utils import get_masks_matrix, get_sdfs
 
-def kmeans_cluster_eid(masks, num_clusters, num_attempts=5, max_num_iterations=10, seed=42):
+def kmeans_cluster_eid(masks, num_clusters, metric="depth", num_attempts=5, max_num_iterations=10, seed=42):
     masks = np.array(masks, dtype=np.float32)
     neg_masks = 1 - masks
     areas = np.sum(masks, axis=(1, 2))
@@ -40,16 +40,40 @@ def kmeans_cluster_eid(masks, num_clusters, num_attempts=5, max_num_iterations=1
                 precompute_out[c] = np.sum((selected_masks.T / selected_areas.T).T, axis=0)
 
             depth_in_cluster = np.empty((num_clusters, num_masks), dtype=np.float32)
+            empty_cluster = False
             for c in range(num_clusters):
                 N = np.sum(cluster_assignment == c)
                 assert(N > 0)
+                if N == 0:
+                    empty_cluster = True
+                    break
                 IN_in = N - inv_areas * np.sum(masks * precompute_in[c], axis=(1,2))
                 IN_out = N - np.sum(neg_masks * precompute_out[c], axis=(1, 2))
                 depth_in_cluster[c] = np.minimum(IN_in, IN_out) / N
                 
+            if empty_cluster:
+                break
+
             old_cluster_assignment = cluster_assignment
-            cluster_assignment = np.argmax(depth_in_cluster, axis=0)
-            depth_sum = np.sum(np.choose(cluster_assignment, depth_in_cluster))
+
+            if metric == "depth":
+                metric_values = depth_in_cluster
+            elif metric == "red":
+                red = np.empty(depth_in_cluster.shape, dtype=np.float32)
+                for c in range(num_clusters):
+                    # Compute the max value exluding the current cluster.
+                    # There is a more efficient, but slightly dirtier, solution.
+                    depth_between = np.max(np.roll(depth_in_cluster, -c, axis=0)[1:,:], axis=0)
+                    assert(np.all(np.abs(depth_between - depth_between) < 0.00001))
+                    depth_within = depth_in_cluster[c,:]
+                    red[c,:] = depth_within - depth_between
+                assert(np.all(np.abs(red - red) < 0.000001))
+                metric_values = red
+            else:
+                assert(False)
+
+            cluster_assignment = np.argmax(metric_values, axis=0)
+            depth_sum = np.sum(np.choose(cluster_assignment, metric_values))
             if depth_sum > best_depth_sum:
                 best_cluster_assignment = cluster_assignment
                 best_depth_sum = depth_sum
