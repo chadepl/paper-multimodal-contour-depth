@@ -11,7 +11,7 @@ from contour_depth.clustering.ddclust import compute_sil, compute_red, compute_c
 
 
 from contour_depth.clustering.inits import initial_clustering
-from contour_depth.clustering.ddclust import cdclust
+from contour_depth.clustering.ddclust import cdclust, kmeans_cluster_eid
 from contour_depth.visualization import plot_clustering, plot_red
 
 from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
@@ -28,7 +28,7 @@ num_contours = 100
 # masks, labs = magnitude_modes(num_contours, 521, 512, return_labels=True, seed=data_seed)
 masks, labs = three_rings(num_contours, 512, 512, return_labels=True, seed=data_seed)
 # masks, labs = shape_families(num_contours, 512, 512, return_labels=True, seed=data_seed)
-# masks, labs = main_shape_with_outliers(num_contours, 512, 512, p_contamination=0.5, return_labels=True, seed=data_seed)
+#masks, labs = main_shape_with_outliers(num_contours, 512, 512, p_contamination=0.5, return_labels=True, seed=data_seed)
 labs = np.array(labs)
 num_clusters = np.unique(labs).size
 
@@ -55,8 +55,8 @@ clustering_kwargs_kmeans = dict(
     max_iter = 200,
     cost_threshold = 0.04, # includes every contour in the swapping 
     swap_subset_max_size = num_contours, # all contours are tested
-    sample_swap_size = False,
-    check_cost_function=False,
+    # sample_swap_size = False,
+    #check_cost_function=False,
     # competing_cluster_method=["sil", "red", "inclusion_rel"][2],
        
 )
@@ -68,12 +68,12 @@ clustering_kwargs_annealing = dict(
     max_iter=200,
     cost_threshold=0,  # we only include contours with ReD below 0 in the swapping 
     swap_subset_max_size=5, # mini-batch
-    sample_swap_size = True,
-    check_cost_function=True,
+    #sample_swap_size = True,
+    #check_cost_function=True,
     # competing_cluster_method=["sil", "red", "inclusion_rel"][2],
 )
 
-clustering_kwargs = clustering_kwargs_kmeans #clustering_kwargs_annealing
+clustering_kwargs = clustering_kwargs_annealing #clustering_kwargs_annealing
 clustering_kwargs.update(dict(
     depth_notion = ["id", "cbd"][0],
     seed = clustering_seed,
@@ -89,12 +89,13 @@ strict_clustering_kwargs["use_fast"] = False
 
 # Run ddclust
 t_start = time()
-strict_labs, _ = cdclust(masks, init_labs, **strict_clustering_kwargs)
+#strict_labs, _ = cdclust(masks, init_labs, **strict_clustering_kwargs)
+kmeans_labs = kmeans_cluster_eid(masks, num_clusters, metric="red", num_attempts=3)
 print(f"Finished cdclust (strict id) in {time() - t_start} seconds")
 
 epsilon_clustering_kwargs = clustering_kwargs
 epsilon_clustering_kwargs["use_modified"] = True
-epsilon_clustering_kwargs["use_fast"] = False
+epsilon_clustering_kwargs["use_fast"] = True
 
 # Run ddclust
 t_start = time()
@@ -166,18 +167,18 @@ axs[2, 1].set_title(f"eID: {red_i.mean():.4f}")
 plot_red(red_w, red_b, compute_red=True, labs=labs, ax=axs[2, 1])
 
 
-axs[0, 2].set_title("ddclust (ID)")
-plot_clustering(masks, strict_labs, ax=axs[0, 2])
+axs[0, 2].set_title("kmeans (eID)")
+plot_clustering(masks, kmeans_labs, ax=axs[0, 2])
 axs[0, 2].set_axis_off()
 
-red_i, red_w, red_b = get_depth_data(masks, strict_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
+red_i, red_w, red_b = get_depth_data(masks, kmeans_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 2].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=strict_labs, ax=axs[1, 2])
+plot_red(red_w, red_b, compute_red=True, labs=kmeans_labs, ax=axs[1, 2])
 axs[1, 2].axhline(y=clustering_kwargs["cost_threshold"], c="green")
 
-red_i, red_w, red_b = get_depth_data(masks, strict_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
+red_i, red_w, red_b = get_depth_data(masks, kmeans_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 2].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=strict_labs, ax=axs[2, 2])
+plot_red(red_w, red_b, compute_red=True, labs=kmeans_labs, ax=axs[2, 2])
 
 
 axs[0, 3].set_title("ddclust (eID)")
