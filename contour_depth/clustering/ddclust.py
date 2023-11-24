@@ -10,6 +10,74 @@ from contour_depth.depth.band_depth import compute_depths as band_depths
 from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
 from contour_depth.utils import get_masks_matrix, get_sdfs
 
+def kmeans_cluster_inclusion_mat(masks, num_clusters, threshold=None, metric="depth", num_attempts=5, max_num_iterations=10, seed=42):    
+    inclusion_mat = compute_epsilon_inclusion_matrix(masks)
+    if threshold is not None:
+        inclusion_mat = (inclusion_mat >= threshold).astype(float)
+    masks = np.array(masks, dtype=np.float32)
+ 
+    num_masks, height, width = masks.shape
+
+    if seed is None:
+        rng = np.random.default_rng()
+    else:
+        rng = np.random.default_rng(seed)  
+    
+    best_depth_sum = -np.inf
+    best_cluster_assignment = None
+    for _ in range(num_attempts):
+        cluster_assignment = rng.integers(low=0, high=num_clusters, size=num_masks)
+        for _ in range(max_num_iterations):
+
+            depth_in_cluster = np.empty((num_clusters, num_masks), dtype=np.float32)
+            empty_cluster = False
+            for c in range(num_clusters):
+                cluster_idx = np.where(cluster_assignment == c)[0]
+                N = cluster_idx.size
+                # assert(N > 0)
+                if N == 0:
+                    empty_cluster = True
+                    break
+                
+                subset_inclusion_mat_in = inclusion_mat[:, cluster_idx]
+                subset_inclusion_mat_out = inclusion_mat[cluster_idx, :]
+                IN_in = subset_inclusion_mat_in.sum(axis=1).flatten()
+                IN_out = subset_inclusion_mat_out.sum(axis=0).flatten()
+
+                depth_in_cluster[c] = np.minimum(IN_in, IN_out) / N
+                
+            if empty_cluster:
+                break
+
+            old_cluster_assignment = cluster_assignment
+
+            if metric == "depth":
+                metric_values = depth_in_cluster
+            elif metric == "red":
+                red = np.empty(depth_in_cluster.shape, dtype=np.float32)
+                for c in range(num_clusters):
+                    # Compute the max value exluding the current cluster.
+                    # There is a more efficient, but slightly dirtier, solution.
+                    depth_between = np.max(np.roll(depth_in_cluster, -c, axis=0)[1:,:], axis=0)
+                    assert(np.all(np.abs(depth_between - depth_between) < 0.00001))
+                    depth_within = depth_in_cluster[c,:]
+                    red[c,:] = depth_within - depth_between
+                assert(np.all(np.abs(red - red) < 0.000001))
+                metric_values = red
+            else:
+                assert(False)
+
+            cluster_assignment = np.argmax(metric_values, axis=0)
+            depth_sum = np.sum(np.choose(cluster_assignment, metric_values))
+            if depth_sum > best_depth_sum:
+                best_cluster_assignment = cluster_assignment
+                best_depth_sum = depth_sum
+
+            if np.all(cluster_assignment == old_cluster_assignment):
+                break
+    return best_cluster_assignment
+
+
 def kmeans_cluster_eid(masks, num_clusters, metric="depth", num_attempts=5, max_num_iterations=10, seed=42):
     masks = np.array(masks, dtype=np.float32)
     neg_masks = 1 - masks
@@ -43,7 +111,7 @@ def kmeans_cluster_eid(masks, num_clusters, metric="depth", num_attempts=5, max_
             empty_cluster = False
             for c in range(num_clusters):
                 N = np.sum(cluster_assignment == c)
-                assert(N > 0)
+                # assert(N > 0)
                 if N == 0:
                     empty_cluster = True
                     break
@@ -755,7 +823,7 @@ def compute_red_between(masks, clustering, n_components, competing_clusters=None
                 contour_ids_2.append(contour_id)
                 mask_subset = [masks[i] for i in contour_ids_2]
                 if (depth_notion == "cbd" and len(contour_ids_2) <= 2) or (depth_notion == "id" and len(contour_ids_2) <= 1):                
-                    depths = np.zeros_like(len(contour_ids_2))
+                    depths = np.zeros(len(contour_ids_2))
                 else:
                     if use_modified and use_fast:
                         assert depth_notion == "id"  # only supported for depth_notion == "id"
