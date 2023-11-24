@@ -11,7 +11,7 @@ from contour_depth.clustering.ddclust import compute_sil, compute_red, compute_c
 
 
 from contour_depth.clustering.inits import initial_clustering
-from contour_depth.clustering.ddclust import cdclust, kmeans_cluster_eid
+from contour_depth.clustering.ddclust import cdclust, kmeans_cluster_eid, kmeans_cluster_inclusion_mat
 from contour_depth.visualization import plot_clustering, plot_red
 
 from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
@@ -78,36 +78,41 @@ clustering_kwargs.update(dict(
     depth_notion = ["id", "cbd"][0],
     seed = clustering_seed,
     output_extra_info=True,
-)
+))
 
-cdclust_kwargs = clustering_kwargs_simple
+cdclust_kwargs = clustering_kwargs_kmeans
 cdclust_kwargs["verbose"] = False
 
 init_labs = initial_clustering(masks, num_components=num_clusters, feat_mat=None, pre_pca=False, method="random", seed=init_seed)
 
-# Run ddclust
-cdclust_kwargs["use_modified"] = True
-cdclust_kwargs["use_fast"] = True
-t_start = time()
-#strict_labs, _ = cdclust(masks, init_labs, **strict_clustering_kwargs)
-kmeans_labs = kmeans_cluster_eid(masks, num_clusters, metric="red", num_attempts=3)
-print(f"Finished cdclust (strict id) in {time() - t_start} seconds")
+# # Run ddclust
+# cdclust_kwargs["use_modified"] = True
+# cdclust_kwargs["use_fast"] = True
+# t_start = time()
+# #strict_labs, _ = cdclust(masks, init_labs, **strict_clustering_kwargs)
+# kmeans_labs = kmeans_cluster_eid(masks, num_clusters, metric="red", num_attempts=3)
+# print(f"Finished cdclust (strict id) in {time() - t_start} seconds")
 
-epsilon_clustering_kwargs = clustering_kwargs
-epsilon_clustering_kwargs["use_modified"] = True
-epsilon_clustering_kwargs["use_fast"] = True
+# epsilon_clustering_kwargs = clustering_kwargs
+# epsilon_clustering_kwargs["use_modified"] = True
+# epsilon_clustering_kwargs["use_fast"] = True
 
-# Run ddclust
-cdclust_kwargs["use_modified"] = True
-cdclust_kwargs["use_fast"] = False
-t_start = time()
-# epsilon_labs, _ = kmeans_cluster_eid(masks, **cdclust_kwargs)
-epsilon_labs, _ = cdclust_simple(masks, **cdclust_kwargs)
-print(f"Finished cdclust anneal V2 (quadratic eid) in {time() - t_start} seconds")
+# # Run ddclust
+# cdclust_kwargs["use_modified"] = True
+# cdclust_kwargs["use_fast"] = False
+# t_start = time()
+# # epsilon_labs, _ = kmeans_cluster_eid(masks, **cdclust_kwargs)
+# epsilon_labs, _ = cdclust_simple(masks, **cdclust_kwargs)
+# print(f"Finished cdclust anneal V2 (quadratic eid) in {time() - t_start} seconds")
 
-# Run kmeans
+# Run kmeans (depth)
 t_start = time()
-kmeans_labs = kmeans_cluster_eid(masks, **clustering_kwargs_kmeans)
+labs1 = kmeans_cluster_eid(masks, num_clusters, metric="red", num_attempts=3)
+print(f"Finished cdclust kmeans (modified id) in {time() - t_start} seconds")
+
+# Run kmeans (red)
+t_start = time()
+labs2 = kmeans_cluster_eid(masks, num_clusters, metric="red", num_attempts=3)
 print(f"Finished cdclust kmeans (modified id) in {time() - t_start} seconds")
 
 ##########
@@ -145,7 +150,7 @@ def get_depth_data(masks, labs, n_components, inclusion_mat, use_modified=False)
     return red_i, red_w, red_b
 
 
-fig, axs = plt.subplots(nrows=3, ncols=5, layout="tight")
+fig, axs = plt.subplots(nrows=3, ncols=4, layout="tight")
 
 # p1
 
@@ -175,46 +180,32 @@ axs[2, 1].set_title(f"eID: {red_i.mean():.4f}")
 plot_red(red_w, red_b, compute_red=True, labs=labs, ax=axs[2, 1])
 
 
-axs[0, 2].set_title("kmeans (eID)")
-plot_clustering(masks, kmeans_labs, ax=axs[0, 2])
+axs[0, 2].set_title("M1")
+plot_clustering(masks, labs1, ax=axs[0, 2])
 axs[0, 2].set_axis_off()
 
-red_i, red_w, red_b = get_depth_data(masks, kmeans_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
+red_i, red_w, red_b = get_depth_data(masks, labs1, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 2].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=kmeans_labs, ax=axs[1, 2])
+plot_red(red_w, red_b, compute_red=True, labs=labs1, ax=axs[1, 2])
 axs[1, 2].axhline(y=clustering_kwargs["cost_threshold"], c="green")
 
-red_i, red_w, red_b = get_depth_data(masks, kmeans_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
+red_i, red_w, red_b = get_depth_data(masks, labs1, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 2].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=kmeans_labs, ax=axs[2, 2])
+plot_red(red_w, red_b, compute_red=True, labs=labs1, ax=axs[2, 2])
 
 
-axs[0, 3].set_title("ddclust (eID quadratic)")
-plot_clustering(masks, epsilon_labs, ax=axs[0, 3])
+axs[0, 3].set_title("M2")
+plot_clustering(masks, labs2, ax=axs[0, 3])
 axs[0, 3].set_axis_off()
 
-red_i, red_w, red_b = get_depth_data(masks, epsilon_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
+red_i, red_w, red_b = get_depth_data(masks, labs2, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
 axs[1, 3].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=epsilon_labs, ax=axs[1, 3])
+plot_red(red_w, red_b, compute_red=True, labs=labs2, ax=axs[1, 3])
 
-red_i, red_w, red_b = get_depth_data(masks, epsilon_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
+red_i, red_w, red_b = get_depth_data(masks, labs2, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
 axs[2, 3].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=epsilon_labs, ax=axs[2, 3])
+plot_red(red_w, red_b, compute_red=True, labs=labs2, ax=axs[2, 3])
 axs[2, 3].axhline(y=clustering_kwargs_annealing["cost_threshold"], c="green")
-
-
-axs[0, 4].set_title("kmeans (eID)")
-plot_clustering(masks, kmeans_labs, ax=axs[0, 4])
-axs[0, 4].set_axis_off()
-
-red_i, red_w, red_b = get_depth_data(masks, kmeans_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
-axs[1, 4].set_title(f"ID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=kmeans_labs, ax=axs[1, 4])
-
-red_i, red_w, red_b = get_depth_data(masks, kmeans_labs, n_components=num_clusters, inclusion_mat=epsilon_inclusion_mat, use_modified=True)
-axs[2, 4].set_title(f"eID: {red_i.mean():.4f}")
-plot_red(red_w, red_b, compute_red=True, labs=kmeans_labs, ax=axs[2, 4])
-axs[2, 4].axhline(y=clustering_kwargs_annealing["cost_threshold"], c="green")
 
 
 plt.show()
