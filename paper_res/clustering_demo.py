@@ -12,7 +12,7 @@ from contour_depth.clustering.ddclust import compute_sil, compute_red, compute_c
 
 from contour_depth.clustering.inits import initial_clustering
 from contour_depth.clustering.ddclust import cdclust, kmeans_cluster_inclusion_matrix, kmeans_cluster_eid
-from contour_depth.visualization import plot_clustering, plot_red
+from contour_depth.visualization import plot_clustering, plot_red, spaghetti_plot
 
 from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
 
@@ -144,7 +144,7 @@ fig, axs = plt.subplots(nrows=3, ncols=4, layout="tight")
 # p1
 
 axs[0, 0].set_title("Initial labels")
-plot_clustering(masks, init_labs, ax=axs[0, 0])
+spaghetti_plot(masks, 0.5, arr=init_labs, is_arr_categorical=True, ax=axs[0,0])
 axs[0, 0].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, init_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
@@ -157,7 +157,7 @@ plot_red(red_w, red_b, compute_red=True, labs=init_labs, ax=axs[2, 0])
 
 
 axs[0, 1].set_title("Target labels")
-plot_clustering(masks, labs, ax=axs[0, 1])
+spaghetti_plot(masks, 0.5, arr=labs, is_arr_categorical=True, ax=axs[0,1])
 axs[0, 1].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
@@ -170,7 +170,7 @@ plot_red(red_w, red_b, compute_red=True, labs=labs, ax=axs[2, 1])
 
 
 axs[0, 2].set_title("kmeans (Inclusion Matrix)")
-plot_clustering(masks, kmeans_matrix_labs, ax=axs[0, 2])
+spaghetti_plot(masks, 0.5, arr=kmeans_matrix_labs, is_arr_categorical=True, ax=axs[0,2])
 axs[0, 2].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, kmeans_matrix_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)
@@ -184,7 +184,7 @@ plot_red(red_w, red_b, compute_red=True, labs=kmeans_matrix_labs, ax=axs[2, 2])
 
 
 axs[0, 3].set_title("kmeans (O(N) eID)")
-plot_clustering(masks, kmeans_ON_labs, ax=axs[0, 3])
+spaghetti_plot(masks, 0.5, arr=kmeans_ON_labs, is_arr_categorical=True, ax=axs[0,3])
 axs[0, 3].set_axis_off()
 
 red_i, red_w, red_b = get_depth_data(masks, kmeans_ON_labs, n_components=num_clusters, inclusion_mat=strict_inclusion_mat, use_modified=False)

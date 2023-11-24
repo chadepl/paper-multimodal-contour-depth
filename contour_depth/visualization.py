@@ -60,11 +60,8 @@ def plot_contour(mask, iso_value=0.5, plot_line=True, line_kwargs=None, plot_mar
 
 
 def spaghetti_plot(masks, iso_value, under_mask=None, arr=None, is_arr_categorical=True, vmin=None, vmax=None,
-                           highlight=None, ax=None, alpha=0.5, linewidth=1, resolution=None, smooth=True, smooth_its=1, smooth_kernel_size=1):
+                           highlight=None, ax=None, alpha=0.5, linewidth=1, smooth=True, smooth_its=1, smooth_kernel_size=1):
     num_members = len(masks)
-    if resolution is None:
-        resolution = masks[0].shape
-    masks = [resize(m, resolution, order=1) for m in masks]
 
     if arr is not None:
         arr = np.array(arr).flatten()
@@ -98,11 +95,11 @@ def spaghetti_plot(masks, iso_value, under_mask=None, arr=None, is_arr_categoric
         fig, ax = plt.subplots(layout="tight", figsize=(10, 10))
 
     if under_mask is None:
-        under_mask_alpha = np.ones(list(resolution) + [3, ])
+        under_mask_alpha = np.ones(list(masks[0].shape) + [3, ])
         under_mask = (under_mask_alpha * 255).astype(int)
         ax.imshow(under_mask, alpha=under_mask_alpha[0])
     else:
-        ax.imshow(resize(under_mask, resolution, order=1), cmap="gray")
+        ax.imshow(under_mask, cmap="gray")
 
     # Smoothing
     if smooth:
@@ -177,7 +174,7 @@ def get_bp_depth_elements(masks, depths, labs=None, outlier_type="tail", epsilon
             new_band100_mask[band100_mask == len(band100_coords)] = 0  # inside
             band100_mask = new_band100_mask
         else:
-            band100_mask = None
+            band100_mask = np.zeros_like(masks[0])  # TODO: should be None?
 
         if len(band50_coords) >= 2:
             band50_mask = np.array([masks[bcoord] for bcoord in band50_coords]).sum(axis=0)
@@ -187,7 +184,7 @@ def get_bp_depth_elements(masks, depths, labs=None, outlier_type="tail", epsilon
             new_band50_mask[band50_mask == len(band50_coords)] = 0  # inside
             band50_mask = new_band50_mask
         else:
-            band50_mask = None
+            band50_mask = np.zeros_like(masks[0])   # TODO: should be None?
 
         cluster_statistics[cluster_id]["bands"] = dict(idx=["b100", "b50"], masks=[band100_mask, band50_mask], weights=[100, 50])
         
@@ -217,13 +214,19 @@ def get_bp_cvp_elements(masks, labs=None):
         pca_medians = get_cvp_pca_medians(pca_mat, labs)
         sdf_means = get_per_cluster_mean(sdf_mat, labs)
         medians = transform_from_pca_to_sdf(np.array(pca_medians)*0.1, np.array(sdf_means), transform_mat)
-        bands = get_cvp_bands(sdf_mat, labs)
+        bands = get_cvp_bands(sdf_mat, labs)  # limits are in 0-level
 
         cluster_statistics = dict()
         for i, cluster_id in enumerate(clusters_ids):            
             cluster_statistics[cluster_id] = dict()
             cluster_statistics[cluster_id]["representatives"] = dict(idx=[-1, ], masks=[(medians[i].reshape(*masks_shape)>0).astype(float), ])
-            cluster_statistics[cluster_id]["bands"] = dict(idx=["b1sigma", ], masks=[(bands[i].reshape(*masks_shape)>0).astype(float), ], weights=[100, ])
+            cluster_statistics[cluster_id]["bands"] = dict()
+            cluster_statistics[cluster_id]["bands"] = dict(idx=["b1sigma", ], weights=[100, ])
+            proc_band = np.zeros_like(bands[i])
+            proc_band[bands[i] < 0] = 2  # outside
+            proc_band[bands[i] > 0] = 1  # in the band
+            # proc_band[band50_mask == len(band50_coords)] = 0  # inside
+            cluster_statistics[cluster_id]["bands"]["masks"] = masks=[(bands[i].reshape(*masks_shape)>0).astype(float), ]
 
         return cluster_statistics
 
@@ -304,19 +307,22 @@ def plot_contour_boxplot(masks, labs, method="depth", method_kwargs=dict(),
             ax.contour(median_mask, levels=[0.5,], colors=[median_color, ], linewidths=[3,])
 
     # Add legend bar    
+    print("shape", masks_shape)
     from matplotlib.patches import Rectangle
-    RECT_WIDTH = 5
-    PADDING_LR = 1
-    PADDING_TB = 2
-    start = PADDING_TB//2
+    OFFSET_R = 0.02 * masks_shape[1]  # distance from right side
+    PADDING_TB = 0.04 * masks_shape[0]  # padding top bottom    
+    RECT_HEIGHT = masks_shape[0] - PADDING_TB
+    RECT_WIDTH = 0.05 * masks_shape[1]
+    BAR_X0 = masks_shape[1] - RECT_WIDTH - OFFSET_R
+    bar_y0 = PADDING_TB/2
     for cluster_id in clusters_ids:
         cluster_color = colors[cluster_id]
         if cluster_id not in focus_clusters:
             cluster_color = "lightgray"
-        rect_height = masks_shape[0]*(num_contours_cluster[cluster_id]/num_contours) - PADDING_TB//2
-        rect = Rectangle((masks_shape[1]-RECT_WIDTH - PADDING_LR, start), RECT_WIDTH, rect_height, color=cluster_color)
+        bar_height = RECT_HEIGHT*(num_contours_cluster[cluster_id]/num_contours)        
+        rect = Rectangle((BAR_X0, bar_y0), RECT_WIDTH, bar_height, color=cluster_color, edgecolor=None)
         ax.add_patch(rect)
-        start += rect_height
+        bar_y0 += bar_height
 
     return ax
 
@@ -357,39 +363,14 @@ def plot_clustering_eval(k_vals, metric_a, metric_a_id, metric_b=None, metric_b_
     lns = lns1
     if lns2 is not None:
         lns += lns2
-    labs = [l.get_label() for l in lns]
-    ax.legend(lns, labs, loc="upper right")
+        labs = [l.get_label() for l in lns]
+        ax.legend(lns, labs, loc="upper right")
 
     if ax_was_none:
         plt.show()
     else:
         return ax, ax2
 
-def plot_clustering(masks, labs, smooth_line=False, ax=None):
-
-    ax_was_none = False
-    if ax is None:
-        ax_was_none = True
-        fig, ax = plt.subplots(layout="tight", figsize=(10, 10))
-    
-    cluster_ids = np.unique(labs)
-    #colors = ["red", "blue", "orange"]
-    for i, cluster_id in enumerate(cluster_ids):
-        contour_ids = np.where(labs == cluster_id)[0]
-        masks_subset = [masks[contour_id] for contour_id in contour_ids]
-        for mask in masks_subset:
-            plot_contour(mask, 
-                         iso_value=0.5, 
-                         plot_line=True, 
-                         line_kwargs=dict(c=colors[i], linewidth=1, alpha=0.5), 
-                         plot_markers=False, 
-                         markers_kwargs=None,
-                         smooth_line=smooth_line, ax=ax)
-            
-    if ax_was_none:
-        plt.show()
-    else:
-        return ax
 
 def sort_red(labs, red_within, red_between=None, sort_by=None):
 
