@@ -126,6 +126,8 @@ if __name__ == "__main__":
     timings_df = timings_df.melt(["seed_data", "sample_size", "method_id"], ["t_slow_secs", "t_fast_secs"], "version_id", "time")
     
     timings_df = timings_df.loc[np.negative(np.logical_and(timings_df.method_id=="id", timings_df.version_id=="t_fast_secs")),:]
+    # timings_df = timings_df.loc[np.negative(np.logical_and(np.logical_and(timings_df.method_id=="cbd", timings_df.version_id=="t_slow_secs"), timings_df.sample_size>100)),:]
+
     timings_df["version_id"] = timings_df["version_id"].apply(lambda d: "No" if d == "t_slow_secs" else "Yes") 
     timings_df["method_id"] = timings_df["method_id"].apply(lambda d: dict(cbd="CBD", id="ID", eid="eID")[d]) 
     timings_df = timings_df.rename(lambda d: dict(method_id="Method", version_id="Optimized")[d] if d in ["method_id", "version_id"] else d, axis=1)
@@ -141,9 +143,9 @@ if __name__ == "__main__":
 
     # sns_plt.set(xscale="log", yscale="log")
     sns_plt.set(yscale="log")
-    ax.set_title("Runtimes vs Ensemble Size for \n Contour Band Depth and Inclusion Depth ")
-    ax.set_ylabel("Log(Time (seconds))")
+    ax.set_title("Runtimes vs ensemble size for \n contour band depth and inclusion depth ")
     ax.set_xlabel("Size")
+    ax.set_ylabel("Log(Time (seconds))")
     
     plt.show()
 
