@@ -11,7 +11,7 @@ from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_
 from contour_depth.utils import get_masks_matrix, get_sdfs
 
 def kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="eid", metric="depth", num_attempts=5, max_num_iterations=10, seed=42):
-    assert(depth in ["eid", "id", "ecbd", "cbd"])
+    assert(depth in ["eid", "id", "cbd"])
     assert(metric in ["depth", "red"])
 
     masks = np.array(masks, dtype=np.float32)
@@ -53,13 +53,13 @@ def kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="eid", metric="de
                         # If the contour is *not* in the cluster then N_a and N_b range from 0 to N
                         N_ab_range = N - j_in_cluster
                         depth_in_cluster[c] = (N_a * N_b) / (N_ab_range * N_ab_range)
-                    else: # id
+                    else: # ID / eID
                         depth_in_cluster[c] = np.minimum(N_a, N_b) / N
-                else: # eCBD (epsilon Cluster Band Depth)
-                    i_in_j = inclusion_matrix[:,j_in_cluster]
-                    j_in_i = inclusion_matrix.T[:,j_in_cluster]
-                    # We need to normalize the depth such that it is  not dependent on the number of contours in the cluster.
-                    depth_in_cluster[c] = np.minimum(i_in_j, j_in_i) / N
+                #else: # eCBD (epsilon Cluster Band Depth)
+                #    i_in_j = inclusion_matrix[:,j_in_cluster]
+                #    j_in_i = inclusion_matrix.T[:,j_in_cluster]
+                #    # We need to normalize the depth such that it is  not dependent on the number of contours in the cluster.
+                #    depth_in_cluster[c] = np.minimum(i_in_j, j_in_i) / N
 
             if metric == "depth":
                 metric_values = depth_in_cluster
