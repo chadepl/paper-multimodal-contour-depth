@@ -44,64 +44,60 @@ if __name__ == "__main__":
     # Data generation #
     ###################
 
-    for seed_data in seeds_data:
-        rng = np.random.default_rng(seed_data)
-        # build ensemble
-        masks, labs = main_shape_with_outliers(N, ROWS, COLS, 
-                                                p_contamination=P_CONTAMINATION, 
-                                                return_labels=True, seed=seed_data)
+    # for seed_data in seeds_data:
+    #     rng = np.random.default_rng(seed_data)
+    #     # build ensemble
+    #     masks, labs = main_shape_with_outliers(N, ROWS, COLS, 
+    #                                             p_contamination=P_CONTAMINATION, 
+    #                                             return_labels=True, seed=seed_data)
 
-        path_df = outputs_dir.joinpath(f"{METHOD}_seed{seed_data}_timings.csv")
-        if path_df.exists():
-            print("df already exists ...")
-        else:
-            # depth computation
-            rows = [["seed_data", "sample_size", "method_id", "t_slow_secs", "t_fast_secs", "mse"]]
+    #     path_df = outputs_dir.joinpath(f"{METHOD}_seed{seed_data}_timings.csv")
+    #     if path_df.exists():
+    #         print("df already exists ...")
+    #     else:
+    #         # depth computation
+    #         rows = [["seed_data", "sample_size", "method_id", "t_slow_secs", "t_fast_secs", "mse"]]
             
-            sample_idx = np.arange(N)
+    #         sample_idx = np.arange(N)
 
-            for sample_size in np.arange(10, N + 1, 10)[::-1]:
-                print(f"[{METHOD}] Processing {sample_size} ... ")
+    #         for sample_size in np.arange(10, N + 1, 10)[::-1]:
+    #             print(f"[{METHOD}] Processing {sample_size} ... ")
 
-                if METHOD == "id" or METHOD == "eid" or (METHOD == "cbd" and sample_size <= 150):
+    #             sample_idx = rng.choice(sample_idx, sample_size, replace=False)
+    #             sample_masks = [masks[i] for i in sample_idx]
 
-                    sample_idx = rng.choice(sample_idx, sample_size, replace=False)
-                    sample_masks = [masks[i] for i in sample_idx]
+    #             method_id = METHOD
+    #             version_dicts = params[METHOD]
 
-                    method_id = METHOD
-                    version_dicts = params[METHOD]
+    #             times = dict()
+    #             depths = dict()
+    #             for version_id, version_params in version_dicts.items():
 
-                    times = dict()
-                    depths = dict()
-                    for version_id, version_params in version_dicts.items():
+    #                 if method_id == "cbd" and version_id == "slow" and sample_size >= 150:
+    #                     print(f"- METHOD was cbd, sample size {sample_size} is too large, skipping it ...")
+    #                     times[version_id] = "NA"
+    #                     depths[version_id] = "NA"
+    #                 else:
+    #                     t_tick = time()
+    #                     d = depth_fun_dict[method_id](sample_masks, **version_params)                
 
-                        if method_id == "cbd" and version_id == "slow" and sample_size >= 155:
-                            times[version_id] = "NA"
-                            depths[version_id] = "NA"
-                        else:
-                            t_tick = time()
-                            d = depth_fun_dict[method_id](sample_masks, **version_params)                
+    #                     times[version_id] = time() - t_tick
+    #                     depths[version_id] = d
 
-                            times[version_id] = time() - t_tick
-                            depths[version_id] = d
+    #             try:
+    #                 mse = np.mean(np.square(depths['slow'] - depths['fast']))
+    #             except:
+    #                 mse = "NA"
+    #             rows.append([seed_data, sample_size, method_id, times["slow"], times["fast"], mse])
 
-                    try:
-                        mse = np.mean(np.square(depths['slow'] - depths['fast']))
-                    except:
-                        mse = "NA"
-                    rows.append([seed_data, sample_size, method_id, times["slow"], times["fast"], mse])
-
-                    print(rows[-1])
-
-                else:
-                    print(f"- METHOD was cbd, sample size {sample_size} is too large, skipping it ...")
+    #             print(rows[-1])
             
-            df = pd.DataFrame(rows[1:])
-            df.columns = rows[0]
-            df.to_csv(path_df)  # write to csv
+    #         df = pd.DataFrame(rows[1:])
+    #         df.columns = rows[0]
+    #         df.to_csv(path_df)  # write to csv
     
-    print(df.head())
-    print()
+    # print(df.head())
+    # print()
 
     ############
     # Analysis #
@@ -150,11 +146,3 @@ if __name__ == "__main__":
     plt.show()
 
     fig.savefig(outputs_dir.joinpath("speed_gains.svg"), dpi=300)
-
-    # cm = plt.colormaps.get_cmap("magma")
-    # fig, axs = plt.subplots(ncols=2)
-    # for d, m in zip(depths_slow, masks):
-    #     axs[0].contour(m, colors=[cm(d),], linewidths=[0.5, ], alpha=0.2)
-    # for d, m in zip(depths_fast, masks):
-    #     axs[1].contour(m, colors=[cm(d),], linewidths=[0.5, ], alpha=0.2)
-    # plt.show()

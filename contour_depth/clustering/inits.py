@@ -8,7 +8,7 @@ from sklearn.cluster import AgglomerativeClustering
 from contour_depth.utils import get_sdfs, get_masks_matrix
 
 
-def initial_clustering(masks, num_components, feat_mat=None, pre_pca=False, method="kmeans", seed=None):
+def initial_clustering(masks, num_components, feat_mat=None, pre_pca=False, method="kmeans", k_means_n_init=5, k_means_max_iter=10, seed=None):
     num_masks = len(masks)
 
     if seed is None:
@@ -29,7 +29,7 @@ def initial_clustering(masks, num_components, feat_mat=None, pre_pca=False, meth
     if method == "random":
         labs = rng.integers(0, num_components, num_masks)
     elif method == "kmeans":
-        labs = KMeans(n_clusters=num_components).fit_predict(mat)
+        labs = KMeans(n_clusters=num_components, n_init=k_means_n_init, max_iter=k_means_max_iter).fit_predict(mat)
     elif method == "ahc":
         ahc = AgglomerativeClustering(n_clusters=num_components, metric="euclidean", linkage="average").fit(mat)
         labs = ahc.labels_

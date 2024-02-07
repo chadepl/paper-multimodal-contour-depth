@@ -11,8 +11,8 @@ from contour_depth.clustering.ddclust import compute_sil, compute_red, compute_c
 
 
 from contour_depth.clustering.inits import initial_clustering
-from contour_depth.clustering.ddclust import cdclust, kmeans_cluster_inclusion_matrix, kmeans_cluster_eid
-from contour_depth.visualization import plot_clustering, plot_red, spaghetti_plot
+from contour_depth.clustering.ddclust import kmeans_cluster_inclusion_matrix, kmeans_cluster_eid
+from contour_depth.visualization import plot_red, spaghetti_plot
 
 from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
 
@@ -26,9 +26,9 @@ init_seed = 1
 
 num_contours = 100
 #masks, labs = magnitude_modes(num_contours, 521, 512, return_labels=True, seed=data_seed)
-#masks, labs = three_rings(num_contours, 512, 512, return_labels=True, seed=data_seed)
+masks, labs = three_rings(num_contours, 512, 512, return_labels=True, seed=data_seed)
 # masks, labs = shape_families(num_contours, 512, 512, return_labels=True, seed=data_seed)
-masks, labs = main_shape_with_outliers(num_contours, 512, 512, p_contamination=0.5, return_labels=True, seed=data_seed)
+# masks, labs = main_shape_with_outliers(num_contours, 512, 512, p_contamination=0.5, return_labels=True, seed=data_seed)
 labs = np.array(labs)
 num_clusters = np.unique(labs).size
 

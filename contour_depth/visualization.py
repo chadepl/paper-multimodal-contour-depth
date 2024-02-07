@@ -151,6 +151,8 @@ def get_bp_depth_elements(masks, depths, labs=None, outlier_type="tail", epsilon
             outliers_idx = np.where(subset_depths <= epsilon_out)[0]  # should be 0
         elif outlier_type == "tail":
             outliers_idx = np.argsort(subset_depths)[:int(epsilon_out)]  # should be 0
+        elif outlier_type == "percent":
+            outliers_idx = np.argsort(subset_depths)[:int(subset_depths.size*epsilon_out)]
         outliers_coords = [coords[oid] for oid in outliers_idx]
         cluster_statistics[cluster_id]["outliers"] = dict(idx=[], masks=[])
         for ocoord in outliers_coords:

@@ -66,23 +66,21 @@ def rasterize_coords(x_coords, y_coords, num_rows, num_cols):
         masks.append(mask)
     return masks
 
-def main_shape_with_outliers(num_masks, num_rows, num_cols, num_vertices=100, p_contamination=0.1, return_labels=False, seed=None):
+def main_shape_with_outliers(num_masks, num_rows, num_cols, num_vertices=100, 
+                             population_radius=0.5,
+                             normal_scale=0.003, normal_freq=0.9,
+                             outlier_scale=0.009, outlier_freq=0.04,
+                             p_contamination=0.1, return_labels=False, seed=None):
 
     if seed is None:
         rng = np.random.default_rng()
     else:
         rng = np.random.default_rng(seed)
         
-    population_radius=0.5
-    normal_scale=0.003
-    normal_freq=0.9
-    outlier_scale=0.009
-    outlier_freq=0.04                                  
-    
     thetas = np.linspace(0, 2 * np.pi, num_vertices)
     population_radius = np.ones_like(thetas) * population_radius  # if we want constant radius (for a circle)
-    gp_sample_normal = get_base_gp(num_masks, thetas, scale=normal_scale, sigma=normal_freq)
-    gp_sample_outliers = get_base_gp(num_masks, thetas, scale=outlier_scale, sigma=outlier_freq)
+    gp_sample_normal = get_base_gp(num_masks, thetas, scale=normal_scale, sigma=normal_freq, seed=seed)
+    gp_sample_outliers = get_base_gp(num_masks, thetas, scale=outlier_scale, sigma=outlier_freq, seed=seed)
 
     should_contaminate = (rng.random(num_masks) > (1 - p_contamination)).astype(float)
     should_contaminate = should_contaminate.reshape(num_masks,-1).repeat(num_vertices, axis=1)
@@ -116,10 +114,10 @@ def compute_modes_sizes(num_masks, modes_proportions):
 
 def magnitude_modes(num_masks, num_rows, num_cols, 
                     modes_proportions=(0.5, 0.5),
-                    modes_radius_mean=(0.2, 0.18),
-                    modes_radius_std=(0.2*0.06, 0.16*0.05),
+                    modes_radius_mean=(0.2, 0.15),
+                    modes_radius_std=(0.2*0.05, 0.15*0.1),
                     modes_center_mean=((0.5, 0.5), (0.5, 0.5)),
-                    modes_center_std=((0, 0), (0, 0)),
+                    modes_center_std=(0.009, 0.01),
                     return_labels=False,
                     seed=None):
 
@@ -131,7 +129,7 @@ def magnitude_modes(num_masks, num_rows, num_cols,
 
     for mode_id in range(num_modes):
         mode_masks = circle_ensemble(modes_sizes[mode_id], num_rows, num_cols, 
-                                     center_mean=modes_center_mean[mode_id], center_std=modes_center_std[mode_id],
+                                     center_mean=modes_center_mean[mode_id], center_std=(modes_center_std[mode_id], modes_center_std[mode_id]),
                                      radius_mean=modes_radius_mean[mode_id], radius_std=modes_radius_std[mode_id], seed=seed)
         mode_labs = [mode_id for _ in range(modes_sizes[mode_id])]
         masks += mode_masks
@@ -197,34 +195,144 @@ def shape_families(num_masks, num_rows, num_cols, return_labels=False, seed=None
 
     radii = rng.normal(100, 20, num_masks)
 
-    # family A
-    for i in range(num_masks//2):
+    # # family A
+    # for i in range(num_masks//2):
 
-        radius = radii[i]
+    #     radius = radii[i]
 
-        mask = np.zeros((512, 512))
-        rr, cc = ellipse(row_c, col_c, radius, radius, shape=(512, 512))
-        mask[rr, cc] = 1
-        masks.append(mask)
-        labels.append(0)
+    #     mask = np.zeros((512, 512))
+    #     rr, cc = ellipse(row_c, col_c, radius, radius, shape=(512, 512))
+    #     mask[rr, cc] = 1
+    #     masks.append(mask)
+    #     labels.append(0)
 
-    # family B
-    for i in range(num_masks - num_masks//2):
-        radius = radii[i]
+    # # family B
+    # for i in range(num_masks - num_masks//2):
+    #     radius = radii[i]
         
-        theta = np.linspace(0, 2*np.pi, 100)
-        r = np.ones(100) * radius
-        r = r + 15 * np.sin(theta * 10)
+    #     theta = np.linspace(0, 2*np.pi, 100)
+    #     r = np.ones(100) * radius
+    #     r = r + 15 * np.sin(theta * 10)
 
-        x = r * np.cos(theta) + 256
-        y = r * np.sin(theta) + 256
+    #     x = r * np.cos(theta) + 256
+    #     y = r * np.sin(theta) + 256
+
+    #     mask = np.zeros((512, 512))
+    #     rr, cc = polygon(y, x, shape=(512, 512))
+    #     mask[rr, cc] = 1
+    #     masks.append(mask)
+    #     labels.append(1)
+    import math
+    def rotate_origin_only(xy, radians):
+        """Only rotate a point around the origin (0, 0).
+        https://gist.github.com/LyleScott/e36e08bfb23b1f87af68c9051f985302"""
+        x, y = xy
+        xx = x * math.cos(radians) + y * math.sin(radians)
+        yy = -x * math.sin(radians) + y * math.cos(radians)
+
+        return xx, yy
+
+    from skimage.transform import EuclideanTransform, warp
+    from scipy.ndimage import rotate
+    rotations = rng.normal(0, 0.1, num_masks)
+    scales = rng.normal(0, 4, num_masks)
+    trans_x = rng.normal(0, 4, num_masks)
+    trans_y = rng.normal(0, 4, num_masks)    
+
+    # family A: square
+    for i in range(num_masks//2):
+        tform = EuclideanTransform(rotation=rotations[i], translation=(trans_x[i], trans_y[i]))
+
+        x = np.array([-1, 1, 1, -1])
+        y = np.array([-1, -1, 1, 1])
+        x, y = rotate_origin_only((x, y), rotations[i])
+        x = x * (100 + scales[i]) + 256 + trans_x[i]
+        y = y * (100 + scales[i]) + 256 + trans_y[i]
 
         mask = np.zeros((512, 512))
         rr, cc = polygon(y, x, shape=(512, 512))
         mask[rr, cc] = 1
+        #mask = warp(mask, tform, order=0)
+
+        masks.append(mask)
+        labels.append(0)
+
+    # family B: triangle
+    for i in range(num_masks - num_masks//2):
+        x = np.array([-1.2, 0, 1.2])
+        y = np.array([-0.8, 1.2, -0.8])
+        x, y = rotate_origin_only((x, y), rotations[i])
+        x = x * (100 + scales[i]) + 256 + trans_x[i]
+        y = y * (100 + scales[i]) + 256 + trans_y[i]
+
+        mask = np.zeros((512, 512))
+        rr, cc = polygon(y, x, shape=(512, 512))
+        mask[rr, cc] = 1
+
         masks.append(mask)
         labels.append(1)
 
     if return_labels:
         return masks, labels
     return masks
+
+
+def close_rings():
+
+    # large
+    m1 = circle_ensemble(10, 512, 512, (0.5, 0.5), (0, 0), 0.25, 0.01)
+    l1 = np.repeat(0, 10).tolist()
+
+    # small
+    m2 = circle_ensemble(10, 512, 512, (0.5, 0.52), (0, 0), 0.16, 0.02)
+    l2 = np.repeat(1, 10).tolist()
+
+    # shifted
+    m3 = circle_ensemble(20, 512, 512, (0.5, 0.7), (0, 0), 0.22, 0.03)
+    l3 = np.repeat(2, 10).tolist()
+    
+    return m1 + m2 + m3, l1 + l2 + l3
+
+def outlier_cluster(num_masks, num_rows, num_cols, return_labels=False, seed=None):
+    """
+    This dataset shows how the ReD metric is more sensitive to nestedness.
+    We have three groups of ellipses:
+    - A group with large radius
+    - A nested group with smaller radius
+    - A group that is nested in the first but adjacent to the second one
+    CVP and traditional kmeans cluster the two inner groups because they are closer spatially
+    Nevetheless one could argue that if two clusters are desired then one of the two inner ones must be left out
+    Which only ReD achieves
+    """
+
+    if seed is None:
+        rng = np.random.default_rng()
+    else:
+        rng = np.random.default_rng(seed)
+
+    seeds = rng.choice(np.arange(1000), 3, replace=False)
+
+    total_num_masks = num_masks
+    m1 = circle_ensemble(2*num_masks//5, num_rows, num_cols, (0.5, 0.5), (0.03, 0.03), 0.25, 0.03, seed=seeds[0])    
+    total_num_masks -= 2*num_masks//5
+    l1 = np.repeat(0, 2*num_masks//5).tolist()
+    m2 = circle_ensemble(2*num_masks//5, num_rows, num_cols, (0.5, 0.5), (0.01, 0.01), 0.12, 0.015, seed=seeds[1])    # inner
+    total_num_masks -= 2*num_masks//5
+    l2 = np.repeat(1, 2*num_masks//5).tolist()
+    m3 = circle_ensemble(total_num_masks, num_rows, num_cols, (0.4, 0.4), (0.01, 0.01), 0.05, 0.02, seed=seeds[2])  # outside
+    l3 = np.repeat(2, total_num_masks).tolist()
+
+    masks = m1 + m2 + m3
+    labels = l1 + l2 + l3
+    
+    if return_labels:
+        return masks, labels
+    return masks
+
+def uneven_sizes():
+    """The idea of this example is to play with the idea of uneven sizes
+    """
+    # m1 = circle_ensemble(30, 512, 512, (0.5, 0.5), (0.04, 0.04), 0.25, 0.01)
+    m1 = circle_ensemble(30, 512, 512, (0.5, 0.5), (0.02, 0.02), 0.25, 0.04)
+    l1 = np.repeat(0, 30).tolist()
+    return m1, l1

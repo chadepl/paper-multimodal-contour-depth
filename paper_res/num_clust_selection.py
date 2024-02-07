@@ -14,11 +14,10 @@ from contour_depth.data.synthetic_data import magnitude_modes, three_rings, shap
 from contour_depth.utils import get_masks_matrix, get_sdfs
 
 
-from contour_depth.clustering.inits import initial_clustering
-from contour_depth.clustering.ddclust import compute_sil, compute_red
-from contour_depth.visualization import plot_clustering, plot_red, plot_clustering_eval
+from contour_depth.clustering.ddclust import compute_sil, compute_red, kmeans_cluster_eid
+from contour_depth.visualization import plot_clustering_eval, spaghetti_plot
 
-from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
+from contour_depth.depth.utils import compute_epsilon_inclusion_matrix
 
 if __name__ == "__main__":
 
@@ -30,7 +29,7 @@ if __name__ == "__main__":
     assert outputs_dir.exists()
 
     seed_data = 0
-    seed_clustering = 0
+    seed_clustering = 1
     seed_init = 0
 
     num_contours = 100
@@ -46,7 +45,8 @@ if __name__ == "__main__":
     sdfs_mat = get_masks_matrix(sdfs)
     sdfs_mat_red = PCA(n_components=50, random_state=seed_clustering).fit_transform(sdfs_mat)
 
-    inclusion_mat = compute_inclusion_matrix(masks)
+    #inclusion_mat = compute_inclusion_matrix(masks)
+    inclusion_mat = compute_epsilon_inclusion_matrix(masks)
 
     ###################
     # Clustering algo #
@@ -62,10 +62,12 @@ if __name__ == "__main__":
     costs = []
     for k in ks:
         print(k)
-        pred_labs = KMeans(n_clusters=k, init="k-means++", n_init=1, random_state=seed_clustering).fit_predict(sdfs_mat_red)
+        #pred_labs = KMeans(n_clusters=k, init="k-means++", n_init=1, random_state=seed_clustering).fit_predict(sdfs_mat_red)
+        pred_labs = kmeans_cluster_eid(masks, k, metric="depth", num_attempts=5, max_num_iterations=10, seed=seed_clustering)
+        # pred_labs = kmeans_cluster_inclusion_mat(masks, k, threshold=0.99, metric="depth", num_attempts=5, max_num_iterations=10, seed=seed_clustering)
         clusterings.append(pred_labs)
         sil_i, _, _, _ = compute_sil(sdfs_mat_red, pred_labs, n_components=k)
-        red_i, _, _, _ = compute_red(masks, pred_labs, n_components=k, competing_clusters=None, depth_notion="id", use_modified=False, use_fast=False, inclusion_mat=inclusion_mat)
+        red_i, _, _, _ = compute_red(masks, pred_labs, n_components=k, competing_clusters=None, depth_notion="id", use_modified=True, use_fast=False, inclusion_mat=inclusion_mat)
         sils.append(sil_i.mean())
         reds.append(red_i.mean())
 
@@ -80,11 +82,14 @@ if __name__ == "__main__":
 
     fig, ax1 = plt.subplots(layout="tight", figsize=(4, 3))
 
-    plot_clustering_eval(ks, reds, metric_b=sils,
+    plot_clustering_eval(ks, reds,                          
                          metric_a_id="ReD", metric_a_lab="Average ReD",
-                         metric_b_id="Sil", metric_b_lab="Average Sil", ax=ax1)
+                         #metric_b=sils, metric_b_id="Sil", metric_b_lab="Average Sil", 
+                         ax=ax1)
+    
+    ax1.set_title("Average ReD per K-clustering ")
 
-    fig.savefig(outputs_dir.joinpath("clust-vs-red-sil.png"), dpi=300)
+    fig.savefig(outputs_dir.joinpath("clust-eval-red.png"), dpi=300)
 
 
     labels = ["min", "max"]
@@ -92,14 +97,14 @@ if __name__ == "__main__":
     all_labs = [clusterings[xmin_id], clusterings[xmax_id]]
     for i, v in enumerate(all_labs):
         fig, ax = plt.subplots(layout="tight", figsize=(3, 3))
-        plot_clustering(masks, v, ax=ax)
+        spaghetti_plot(masks, 0.5, arr=v, is_arr_categorical=True, ax=ax)
         ax.set_axis_off()
         fig.savefig(outputs_dir.joinpath(f"{labels[i]}.png"), dpi=300)
 
 
     for i, v in enumerate(clusterings):
         fig, ax = plt.subplots(layout="tight", figsize=(1, 1))
-        plot_clustering(masks, v, ax=ax)
+        spaghetti_plot(masks, 0.5, arr=v, is_arr_categorical=True, ax=ax)
         ax.set_axis_off()
         fig.savefig(outputs_dir.joinpath(f"clustering_k{i + 2}.png"), dpi=300)
 

@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, "..")
 from contour_depth.data import han_seg_ensembles as hanseg
 from contour_depth.depth import inclusion_depth, band_depth
-from contour_depth.clustering.ddclust import cdclust, compute_red
+from contour_depth.clustering.ddclust import cdclust, cdclust_simple, compute_red, kmeans_cluster_eid
 from contour_depth.clustering.inits import initial_clustering 
 from contour_depth.visualization import plot_clustering, spaghetti_plot, plot_red, sort_red, plot_clustering_eval
 from contour_depth.utils import get_masks_matrix, get_sdfs
@@ -65,6 +65,26 @@ if __name__ == "__main__":
         output_extra_info=True
     )
 
+    # erase
+    # from contour_depth.clustering.ddclust import compute_red
+    # n_components = 2
+    # # labs = initial_clustering(masks, num_components=n_components, method="random", seed=seed_init)
+    # #pred_labs_1, red_i = cdclust(masks, labs, **general_clustering_kwargs)
+    # # pred_labs_1 = cdclust_simple(masks, num_clusters=n_components, num_attempts=1, max_num_iterations=10, use_modified=True, use_fast=True, seed=1)
+    # # pred_labs_2 = kmeans_cluster_eid(masks, num_clusters=n_components, num_attempts=1, max_num_iterations=10, seed=1)
+    # pred_labs_1 = kmeans_cluster_eid(masks, metric="depth", num_clusters=n_components, num_attempts=5, max_num_iterations=10, seed=1)
+    # pred_labs_2 = kmeans_cluster_eid(masks, metric="red", num_clusters=n_components, num_attempts=5, max_num_iterations=10, seed=1)
+    # red1, _, _, _ = compute_red(masks, pred_labs_1, n_components=n_components, use_modified=True, use_fast=False)
+    # red2, _, _, _ = compute_red(masks, pred_labs_2, n_components=n_components, use_modified=True, use_fast=False)
+    # fig, axs = plt.subplots(ncols=2)
+    # plot_clustering(masks, pred_labs_1, ax=axs[0])
+    # axs[0].set_title(f"cdclust-kmeans (depth) = {red1.mean()}")
+    # axs[0].set_axis_off()
+    # plot_clustering(masks, pred_labs_2, ax=axs[1])
+    # axs[1].set_title(f"cdclust-kmeans (ReD) = {red2.mean()}")
+    # axs[1].set_axis_off()
+    # plt.show()
+
     ####################
     # Opt num clusters #
     ####################
@@ -82,7 +102,9 @@ if __name__ == "__main__":
         for n_components in possible_n_components:
             print(f"k_eval {n_components}")
             labs = initial_clustering(masks, num_components=n_components, method="random", seed=seed_init)
-            pred_labs, red_i = cdclust(masks, labs, **general_clustering_kwargs)
+            #pred_labs, red_i = cdclust(masks, labs, **general_clustering_kwargs)
+            pred_labs = kmeans_cluster_eid(masks, num_clusters=n_components, metric="depth", num_attempts=5, max_num_iterations=10, seed=seed_cdclust)
+            red_i, _, _, _ = compute_red(masks, pred_labs, n_components=n_components, depth_notion="id", use_modified=True, use_fast=True)
             reds.append(red_i.mean())
 
             np.save(outputs_dir.joinpath(f"{prefix}_k-{n_components}_pred-labs.npy"), pred_labs)
@@ -165,8 +187,9 @@ if __name__ == "__main__":
     
     # - clusters
     fig, ax = plt.subplots(figsize=(5, 5), layout="tight")
-    depth_method_kwargs = dict(depths=red_i, outlier_type="tail", epsilon_out=7)
-    plot_contour_boxplot(masks, pred_labs, method="depth", method_kwargs=depth_method_kwargs, under_mask=img, smooth=True, smooth_its=SMOOTH_ITS, smooth_kernel_size=SMOOTH_K_SIZE, ax=ax)
+    depth_method_kwargs = dict(depths=red_i, labs=pred_labs, outlier_type="tail", epsilon_out=7)
+    cluster_statistics = get_bp_depth_elements(masks, **depth_method_kwargs)
+    plot_contour_boxplot(masks, pred_labs, cluster_statistics=cluster_statistics, under_mask=img, smooth=True, smooth_its=SMOOTH_ITS, smooth_kernel_size=SMOOTH_K_SIZE, ax=ax)
     # plt.show()
 
     fig.savefig(outputs_dir.joinpath(f"{prefix}_boxplot_clusters.png"), dpi=300)

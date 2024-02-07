@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from skimage.measure import find_contours
 import skimage.io
 
-def load_data(data_dir, config_id=0):
+def load_data(data_dir, config_id=0, verbose=False):
     """ Loads data.
     """
     data_dir = Path(data_dir)
@@ -30,16 +30,19 @@ def load_data(data_dir, config_id=0):
     assert f.exists()
 
     rootgrp = Dataset(f, "r", "NETCDF4")
-    print("Data model: ")
-    print(rootgrp.data_model)
-    print()
-    print("Dimensions: ")
-    for dimobj in rootgrp.dimensions.values():
-        print(dimobj)
-    # print()
-    # print("Variables: ")
-    # for varobj in rootgrp.variables.values():
-    #     print(varobj)
+
+    if verbose:
+        print("Data model: ")
+        print(rootgrp.data_model)
+        print()
+        print("Dimensions: ")
+        for dimobj in rootgrp.dimensions.values():
+            print(dimobj)
+        # print()
+        # print("Variables: ")
+        # for varobj in rootgrp.variables.values():
+        #     print(varobj)
+        print()
 
     geopot = rootgrp["Geopotential_isobaric"][...]
     geopot = geopot / 9.81
@@ -49,11 +52,12 @@ def load_data(data_dir, config_id=0):
     lon = rootgrp["lon"][...]
     isobaric = rootgrp["isobaric"][...]
 
-    print()
-    print(rootgrp["Geopotential_isobaric"])
-    print()
-    print(lat.shape, lat[0], lat[-1])  # latitude is y-axis/rows
-    print(lon.shape, lon[0], lon[-1])  # longitude is x-axis/cols
+    if verbose:
+        print(rootgrp["Geopotential_isobaric"])
+        print()
+        print(lat.shape, lat[0], lat[-1])  # latitude is y-axis/rows
+        print(lon.shape, lon[0], lon[-1])  # longitude is x-axis/cols
+        print()
 
     ##########################
     # Full ensemble analysis #

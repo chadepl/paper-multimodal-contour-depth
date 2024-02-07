@@ -124,7 +124,7 @@ def inclusion_depth_modified_fast(in_ci, masks, precompute_in=None, precompute_o
     if precompute_in is None:
         precompute_in = get_precompute_in(masks)
     if precompute_out is None:
-        precompute_out = get_precompute_out
+        precompute_out = get_precompute_out(masks)
 
     IN_in = num_masks - ((in_ci / in_ci.sum()) * precompute_in).sum()
     IN_out = num_masks - ((1-in_ci) * precompute_out).sum()

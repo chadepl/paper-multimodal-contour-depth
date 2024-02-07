@@ -75,6 +75,12 @@ def get_cvp_sdf_pca_transform(masks, threshold_explained_var=0.999, seed=None):
     return sdf_mat, pca_mat, transform_mat
 
 
+# 1. Compute SDF of contours
+# 2. Compute PCA
+# 3. Perform clustering using AHC
+# 4. Compute bands and medians
+
+
 def get_cvp_clustering(pca_mat, num_components):
     
     ahc = AgglomerativeClustering(n_clusters=num_components, 
@@ -106,16 +112,29 @@ def get_per_cluster_mean(mat, labs):
         means.append(mean)
     return means
 
-def get_cvp_bands(sdf_mat, labs, std_mult=1):
+def get_cvp_bands(sdf_mat, labs, std_mult=1.5):
     bands = []
     for k in np.unique(labs):
         sdf_cluster_mat = sdf_mat[np.where(labs == k)]
         sdf_mean = np.mean(sdf_cluster_mat, axis=0)
-        sdf_var = np.var(sdf_cluster_mat, axis=0)
+        sdf_var = np.std(sdf_cluster_mat, axis=0)
         band_bounds = np.array([- (sdf_mean - std_mult * sdf_var), 
                          sdf_mean + std_mult * sdf_var])
-        band = band_bounds.min(axis=0)
+        band = np.prod((band_bounds > 0).astype(float), axis=0)
+        #band = band_bounds.min(axis=0)  # limits are in 0-level        
         bands.append(band)
     return bands
 
+
+def get_cvp_bands_parts(sdf_mat, labs, std_mult=1.5):
+    bands = []
+    for k in np.unique(labs):
+        sdf_cluster_mat = sdf_mat[np.where(labs == k)]
+        sdf_mean = np.mean(sdf_cluster_mat, axis=0)
+        sdf_var = np.std(sdf_cluster_mat, axis=0)
+        band_bounds = np.array([- (sdf_mean - std_mult * sdf_var), 
+                         sdf_mean + std_mult * sdf_var]) 
+        #band = band_bounds.min(axis=0)  # limits are in 0-level        
+        bands.append(band_bounds)
+    return bands
 
