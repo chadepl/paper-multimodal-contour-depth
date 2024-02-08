@@ -17,7 +17,7 @@ from contour_depth.competing.cvp import get_cvp_sdf_pca_transform, get_cvp_clust
 from contour_depth.visualization import spaghetti_plot, plot_contour_boxplot, colors
 
 colors_cvp = [colors[2], colors[1], colors[0]] 
-colors_cdclust = [colors[1], colors[0], colors[2]] 
+colors_cdclust = colors_cvp # [colors[1], colors[0], colors[2]] 
 
 from contour_depth.visualization import get_bp_cvp_elements, get_bp_depth_elements
 
@@ -119,12 +119,16 @@ if __name__ == "__main__":
     red_i_cdclust, red_w_cdclust, _, _ = compute_red(masks, pred_labs_cdclust, n_components=3)
     depth_cluster_statistics_cdclust = get_bp_depth_elements(masks, red_w_cdclust, pred_labs_cdclust, outlier_type="percent", epsilon_out=0.1)
 
+    # -- reorder cd clust labels in decreasing order
     cid, ccount = np.unique(pred_labs_cdclust, return_counts=True)
     ccount_argsort = np.argsort(ccount)[::-1]    
     new_pred_labs = np.ones_like(pred_labs_cdclust)*-1 
+    new_depth_cluster_statistics_cdclust = {}
     for i, old_cid in enumerate(ccount_argsort):
         new_pred_labs[pred_labs_cdclust == old_cid] = i
+        new_depth_cluster_statistics_cdclust[i] = depth_cluster_statistics_cdclust[old_cid]
     pred_labs_cdclust = new_pred_labs
+    depth_cluster_statistics_cdclust = new_depth_cluster_statistics_cdclust
     # colors_cdclust = [colors_cdclust[i] for i in ccount_argsort]
 
 
@@ -245,23 +249,24 @@ if __name__ == "__main__":
 
     # * Depth clustering *
     if True:
-        medians = []
-        bands_sf = []
-        outliers = []    
-        for cluster_id in range(3):
+        medians = {}
+        bands_sf = {}
+        outliers = {}
+        clusters_ids = [0, 1, 2, ] #list(range(3))
+        for cluster_id in clusters_ids:
             cluster_info = depth_cluster_statistics_cdclust[cluster_id]
 
             median = cluster_info["representatives"]["masks"][0]
             median = resize(median, (extent[3]-extent[2], extent[1]-extent[0]), order=0)
             for _ in range(5):
                 median = gaussian(median, sigma=10)
-            medians.append(median)
+            medians[cluster_id] = median
 
             band = cluster_info["bands"]["masks"][0] # 100% band
             band = resize(band, (extent[3]-extent[2], extent[1]-extent[0]), order=1)
             for _ in range(5):
                     band = gaussian(band, sigma=10)
-            bands_sf.append(band) 
+            bands_sf[cluster_id] = band
             
             outs = []
             for out in cluster_info["outliers"]["masks"]:
@@ -270,11 +275,11 @@ if __name__ == "__main__":
                 for _ in range(5):
                     new_out = gaussian(new_out, sigma=10)
                 outs.append(new_out)
-            outliers.append(outs)
+            outliers[cluster_id] = outs
 
         fig, ax = plt.subplots(layout="tight")
         ax.imshow(bg_img, cmap="gray")
-        for cluster_id in range(3):
+        for cluster_id in clusters_ids:
             ax.contour(medians[cluster_id], levels=[0.5, ], colors=[colors_cdclust[cluster_id], ], linewidths=[median_linewidth,], extent=extent)
             ax.contourf(bands_sf[cluster_id], levels=[0.5, 1.5], colors=[colors_cdclust[cluster_id], ], alpha=(100/100) * 0.3, extent=extent)
             # for out in outliers[cluster_id]:
@@ -293,7 +298,15 @@ if __name__ == "__main__":
 
 
     
-
+    # idx = np.where(pred_labs_cdclust == 2)[0] 
+    # cols = 4
+    # rows = idx.size // cols + 1
+    # fig, axs = plt.subplots(ncols=cols, nrows=rows)
+    # axs = axs.flatten()
+    # for i, j in enumerate(idx):
+    #     axs[i].set_title(j)
+    #     axs[i].imshow(masks[j])
+    # plt.show()
     
 
 

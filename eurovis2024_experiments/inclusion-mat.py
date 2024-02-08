@@ -1,4 +1,6 @@
-
+"""
+Computes inclusion matrices for simple ensemble of contours (mock-ensemble)
+"""
 import numpy as np
 from skimage.io import imread
 from skimage.color import rgb2gray
