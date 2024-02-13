@@ -5,6 +5,7 @@
 """
 from pathlib import Path
 import numpy as np
+from sklearn.metrics import adjusted_rand_score
 import matplotlib.pyplot as plt
 
 import sys
@@ -31,15 +32,20 @@ if __name__ == "__main__":
     K = 2
 
     masks, labs = main_shape_with_outliers(100, ROWS, COLS, return_labels=True, seed=SEED_DATA)
+    labs = np.array(labs)
 
     ###################
     # Data generation #
     ###################
 
     sdf_mat, pca_mat, transform_mat = get_cvp_sdf_pca_transform(masks, seed=SEED_CLUSTER)
-    pred_labs1 = get_cvp_clustering(pca_mat, num_components=K)
+    pred_labs1 = get_cvp_clustering(pca_mat, num_components=17)
     pred_labs2 = kmeans_cluster_inclusion_matrix(masks, num_clusters=K, depth="id", num_attempts=5, max_num_iterations=10, seed=SEED_CLUSTER)
     pred_labs3 = initial_clustering(masks, num_components=K, feat_mat=pca_mat, method="kmeans", k_means_n_init=5, k_means_max_iter=10, seed=SEED_CLUSTER)
+
+    print(f"CVP: {adjusted_rand_score(labs, pred_labs1)}")
+    print(f"CDclust: {adjusted_rand_score(labs, pred_labs2)}")
+    print(f"KMeans: {adjusted_rand_score(labs, pred_labs3)}")
 
     ############
     # Analysis #
