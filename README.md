@@ -26,6 +26,8 @@ If you use our code in your publications please consider citing:
 
 [Future link to paper]
 
+Also, consider checking the paper where we introduce the [Inclusion Depth](https://graphics.tudelft.nl/inclusion-depth-paper) for contour ensembles. And, if you want to integrate contour depth in your project, check out the [`contour-depth` Python package](https://graphics.tudelft.nl/contour-depth).
+
 ## Setup
 1. Install a conda (we recommend using [miniconda](https://docs.conda.io/projects/miniconda/en/latest/))
 2. Create environment: `conda create --name=multimodal-depth python=3.9.18`
