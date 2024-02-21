@@ -1,4 +1,4 @@
-# contour-depth
+# Multimodal Depth for Contour Ensembles
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://badge.fury.io/py/library-name.svg)](https://badge.fury.io/py/library-name)
