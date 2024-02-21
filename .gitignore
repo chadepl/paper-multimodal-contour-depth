@@ -10,3 +10,4 @@
 *.pl.nc
 __pychache__
 !fig-header.png
+archive
