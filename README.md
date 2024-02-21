@@ -5,7 +5,7 @@
 Code for the paper Depth for Multi-Modal Contour Ensembles.
 
 This repository contains the code for the paper:
-> Chaves-de-Plaza, N.F., Mody, P., Staring, M., van Egmond, R., Vilanova, A., Hildebrandt, K., Inclusion Depth for Contour Ensembles, 2024, IEEE TCVG (under revision).
+> Chaves-de-Plaza, N.F., Mody, P., Staring, M., van Egmond, R., Vilanova, A., Hildebrandt, K., Inclusion Depth for Contour Ensembles, 2024, EuroVis 2024 (under revision).
 
 ![figs 8 and 9 of the paper](fig-header.png)
 
