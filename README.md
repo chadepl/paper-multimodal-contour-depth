@@ -9,10 +9,10 @@ This repository contains the code for the paper:
 
 ![figs 8 and 9 of the paper](fig-header.png)
 
-If you use our code in your publications please consider citing:
+If you use our code in your publications, please consider citing:
 ```
 @article{chavesdeplaza2024multimodaldepth,
-    title={Multi-Modal Contour Ensembles},
+    title={Depth for Multi-Modal Contour Ensembles},
     author={Chaves-de-Plaza, Nicolas and Molenaar, Mathijs and Mody, Prerak and Staring, Marius and van Egmond, Ren\'{e} and Eisemann, Elmar and Vilanova, Anna and Hildebrandt, Klaus},
     journal={TODO},
     year={2024},
@@ -26,7 +26,7 @@ If you use our code in your publications please consider citing:
 
 [Future link to paper]
 
-Also, consider checking the paper where we introduce the [Inclusion Depth](https://graphics.tudelft.nl/inclusion-depth-paper) for contour ensembles. And, if you want to integrate contour depth in your project, check out the [`contour-depth` Python package](https://graphics.tudelft.nl/contour-depth).
+Also, consider checking the paper where we introduce the [Inclusion Depth for Contour Ensembles](https://graphics.tudelft.nl/inclusion-depth-paper). And, if you want to integrate contour depth in your project, check out the [`contour-depth` Python package](https://graphics.tudelft.nl/contour-depth).
 
 ## Setup
 1. Install a conda (we recommend using [miniconda](https://docs.conda.io/projects/miniconda/en/latest/))
