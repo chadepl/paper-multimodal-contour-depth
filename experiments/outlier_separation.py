@@ -33,13 +33,14 @@ if __name__ == "__main__":
 
     masks, labs = main_shape_with_outliers(100, ROWS, COLS, return_labels=True, seed=SEED_DATA)
     labs = np.array(labs)
+    labs = 1 - labs
 
     ###################
     # Data generation #
     ###################
 
     sdf_mat, pca_mat, transform_mat = get_cvp_sdf_pca_transform(masks, seed=SEED_CLUSTER)
-    pred_labs1 = get_cvp_clustering(pca_mat, num_components=17)
+    pred_labs1 = get_cvp_clustering(pca_mat, num_components=K)
     pred_labs2 = kmeans_cluster_inclusion_matrix(masks, num_clusters=K, depth="id", num_attempts=5, max_num_iterations=10, seed=SEED_CLUSTER)
     pred_labs3 = initial_clustering(masks, num_components=K, feat_mat=pca_mat, method="kmeans", k_means_n_init=5, k_means_max_iter=10, seed=SEED_CLUSTER)
 
@@ -61,7 +62,7 @@ if __name__ == "__main__":
     plt.show()
 
     # individual plots
-    for labs_name, labs in [("cdclust", pred_labs2), ("kmeans", pred_labs3), ("ahc", pred_labs1)]:
+    for labs_name, labs in [("reference", labs), ("cdclust", pred_labs2), ("kmeans", pred_labs3), ("ahc", pred_labs1)]:
         fig, ax = plt.subplots(figsize=(5,5), layout="tight")
         spaghetti_plot(masks, 0.5, arr=labs, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, linewidth=3, ax=ax)
         fig.savefig(outputs_dir.joinpath(f"{labs_name}.png"), dpi=300)

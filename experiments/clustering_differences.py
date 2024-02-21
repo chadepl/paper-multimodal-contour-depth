@@ -55,12 +55,12 @@ if __name__ == "__main__":
     spaghetti_plot(masks, 0.5, arr=labs, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, ax=axs[0])
     spaghetti_plot(masks, 0.5, arr=pred_labs1, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, ax=axs[1])
     spaghetti_plot(masks, 0.5, arr=pred_labs2, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, ax=axs[2])
-    # spaghetti_plot(masks, 0.5, arr=pred_labs3, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, ax=axs[3])
+    spaghetti_plot(masks, 0.5, arr=pred_labs3, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, ax=axs[3])
 
     plt.show()
 
     # individual plots
-    for labs_name, labs in [("ahc", pred_labs1), ("cdclust", pred_labs2)]:#[("cdclust", pred_labs2), ("kmeans", pred_labs3), ("ahc", pred_labs1)]:
+    for labs_name, labs in [("reference", labs), ("cdclust", pred_labs2), ("kmeans", pred_labs3), ("ahc", pred_labs1)]:
         fig, ax = plt.subplots(figsize=(5,5), layout="tight")
         spaghetti_plot(masks, 0.5, arr=labs, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, linewidth=3, ax=ax)
         fig.savefig(outputs_dir.joinpath(f"{labs_name}.png"), dpi=300)
