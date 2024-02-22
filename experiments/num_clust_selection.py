@@ -12,14 +12,14 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.data.synthetic_data import magnitude_modes, three_rings, shape_families
-from contour_depth.utils import get_masks_matrix, get_sdfs
+from src.data.synthetic_data import magnitude_modes, three_rings, shape_families
+from src.utils import get_masks_matrix, get_sdfs
 
 
-from contour_depth.clustering.ddclust import compute_sil, compute_red, kmeans_cluster_eid
-from contour_depth.visualization import plot_clustering_eval, spaghetti_plot
+from src.clustering.cdclust import compute_sil, compute_red, kmeans_cluster_eid
+from src.visualization import plot_clustering_eval, spaghetti_plot
 
-from contour_depth.depth.utils import compute_epsilon_inclusion_matrix
+from src.depth.utils import compute_epsilon_inclusion_matrix
 
 if __name__ == "__main__":
 
