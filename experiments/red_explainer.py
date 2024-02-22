@@ -6,13 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys 
 sys.path.insert(0, "..")
-from contour_depth.data.synthetic_data import three_rings, shape_families, magnitude_modes
-from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
-from contour_depth.depth.inclusion_depth import compute_depths
-from contour_depth.clustering.ddclust import compute_red, compute_red_within, compute_red_between
-from contour_depth.clustering.ddclust import compute_sil, compute_sil_within, compute_sil_between
-from contour_depth.visualization import plot_clustering, plot_red
-from contour_depth.clustering.inits import initial_clustering
+from src.data.synthetic_data import three_rings, shape_families, magnitude_modes
+from src.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
+from src.depth.inclusion_depth import compute_depths
+from src.clustering.cdclust import compute_red_within, compute_red_between
+from src.visualization import spaghetti_plot, plot_red
+from src.clustering.inits import initial_clustering
 
 if __name__ == "__main__":
 
@@ -66,7 +65,7 @@ if __name__ == "__main__":
     # p1
 
     axs[0, 0].set_title("No partitioning")
-    plot_clustering(masks, labs_no_part, ax=axs[0, 0])
+    spaghetti_plot(masks, 0.5, arr=labs_no_part, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, linewidth=3, ax=axs[0, 0])
     axs[0, 0].set_axis_off()
 
     unimodal_depths = compute_depths(masks, modified=False, fast=False, inclusion_mat=inclusion_mat)
@@ -82,7 +81,7 @@ if __name__ == "__main__":
     # p2
 
     axs[0, 1].set_title("Target labels")
-    plot_clustering(masks, labs, ax=axs[0, 1])
+    spaghetti_plot(masks, 0.5, arr=labs, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, linewidth=3, ax=axs[0, 1])
     axs[0, 1].set_axis_off()
 
     red_i, red_w, red_b = get_depth_data(masks, labs, n_components=num_clusters, inclusion_mat=inclusion_mat, use_modified=False)
@@ -98,7 +97,7 @@ if __name__ == "__main__":
     # p3
 
     axs[0,2].set_title("Random labels")
-    plot_clustering(masks, random_labs, ax=axs[0,2])
+    spaghetti_plot(masks, 0.5, arr=random_labs, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, linewidth=3, ax=axs[0, 2])
     axs[0,2].set_axis_off()
 
     red_i, red_w, red_b = get_depth_data(masks, random_labs, n_components=num_clusters, inclusion_mat=inclusion_mat, use_modified=False)
@@ -114,7 +113,7 @@ if __name__ == "__main__":
     # p4
 
     axs[0,3].set_title("Some misplaced labels")
-    plot_clustering(masks, perturbed_labs, ax=axs[0,3])
+    spaghetti_plot(masks, 0.5, arr=perturbed_labs, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, linewidth=3, ax=axs[0, 3])
     axs[0,3].set_axis_off()
 
     red_i, red_w, red_b = get_depth_data(masks, perturbed_labs, n_components=num_clusters, inclusion_mat=inclusion_mat, use_modified=False)
@@ -139,7 +138,7 @@ if __name__ == "__main__":
     all_labs = [labs_no_part, labs, random_labs, perturbed_labs]
     for i, v in enumerate(all_labs):
         fig, ax = plt.subplots(layout="tight", figsize=(3, 3))
-        plot_clustering(masks, v, ax=ax)
+        spaghetti_plot(masks, 0.5, arr=v, is_arr_categorical=True, smooth=True, smooth_its=1, smooth_kernel_size=1, linewidth=3, ax=ax)
         ax.set_axis_off()
         fig.savefig(outputs_dir.joinpath(f"{labels[i]}.png"), dpi=300)
 
@@ -150,5 +149,3 @@ if __name__ == "__main__":
         ax.set_xlabel("Contour ID")
         ax.set_ylabel("Depth")
         fig.savefig(outputs_dir.joinpath(f"red-{labels[i]}.png"), dpi=300)
-
-    # TODO: add x and y labels

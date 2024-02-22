@@ -4,7 +4,7 @@ This folder includes the scripts necessary to generate the figures and tables us
 
 ## Index
 
-- Fig 2 (`inclusion_mat.py`)
+- Fig 2 (`inclusion_mat.py`): Computes inclusion matrices for simple ensemble of contours (mock-ensemble). We then use the values in the plots to construct the depiction in the paper.
 - Fig 3 (`red_explainer.py`): explainer plot of the different components of the ReD criteria and how it helps identifying outliers that sil might not catch.
 - Fig 4 (`fast_depth_computation_benchmark.py`): generates a plot of number of contours vs time and a scatter plot comparing the depth scores, making evident the MSE is 0.
 - Fig 5 (`progressive_demo.py`): generates a plot that shows the time that it takes to compute the depths of an ensemble in a progressive manner. The idea is to show the time that the user would need to wait.
