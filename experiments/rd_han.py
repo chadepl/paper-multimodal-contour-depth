@@ -7,13 +7,11 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.data import han_seg_ensembles as hanseg
-from contour_depth.depth import inclusion_depth, band_depth
-from contour_depth.clustering.ddclust import cdclust, cdclust_simple, compute_red, kmeans_cluster_eid
-from contour_depth.clustering.inits import initial_clustering 
-from contour_depth.visualization import plot_clustering, spaghetti_plot, plot_red, sort_red, plot_clustering_eval
-from contour_depth.utils import get_masks_matrix, get_sdfs
-from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
+from src.data import han_seg_ensembles as hanseg
+from src.depth import inclusion_depth
+from src.clustering.cdclust import compute_red, kmeans_cluster_eid
+from src.clustering.inits import initial_clustering 
+from src.visualization import spaghetti_plot, sort_red, plot_clustering_eval
 
 
 if __name__ == "__main__":
@@ -139,7 +137,7 @@ if __name__ == "__main__":
     # Figure band depths clustering #
     #################################  
 
-    from contour_depth.visualization import plot_contour_boxplot, get_bp_depth_elements
+    from src.visualization import plot_contour_boxplot, get_bp_depth_elements
 
     best_k_id = np.argsort(k_eval[:, 1])[-1]
     best_k = int(k_eval[best_k_id, 0])
