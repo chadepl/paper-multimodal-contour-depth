@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.depth.inclusion_depth import compute_depths as inclusion_depth
-from contour_depth.depth.band_depth import compute_depths as contour_band_depth
-from contour_depth.data.synthetic_data import main_shape_with_outliers
+from src.depth.inclusion_depth import compute_depths as inclusion_depth
+from src.depth.band_depth import compute_depths as contour_band_depth
+from src.data.synthetic_data import main_shape_with_outliers
 
 if __name__ == "__main__":
 

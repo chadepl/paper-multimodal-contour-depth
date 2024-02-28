@@ -1,5 +1,6 @@
 """
 Computes inclusion matrices for simple ensemble of contours (mock-ensemble)
+We then use the values in the plots to construct the depiction in the paper.
 """
 import numpy as np
 from skimage.io import imread
@@ -8,7 +9,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
+from src.depth.utils import compute_inclusion_matrix, compute_epsilon_inclusion_matrix
 
 masks = [imread(f"mock-ensemble/mock-ensemble-m{i+1}.png") for i in range(6)]
 masks = [rgb2gray(m[:, :, 0:3]) for m in masks]
