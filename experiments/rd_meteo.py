@@ -11,15 +11,15 @@ from skimage.io import imread
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.data import ecmwf_ensembles as ecmwf
-from contour_depth.clustering.ddclust import compute_red, kmeans_cluster_eid
-from contour_depth.competing.cvp import get_cvp_sdf_pca_transform, get_cvp_clustering, get_cvp_pca_medians, get_cvp_bands, get_cvp_bands_parts, transform_from_pca_to_sdf, get_per_cluster_mean
-from contour_depth.visualization import spaghetti_plot, plot_contour_boxplot, colors
+from src.data import ecmwf_ensembles as ecmwf
+from src.clustering.cdclust import compute_red, kmeans_cluster_eid
+from src.competing.cvp import get_cvp_sdf_pca_transform, get_cvp_clustering, get_cvp_pca_medians, get_cvp_bands, get_cvp_bands_parts, transform_from_pca_to_sdf, get_per_cluster_mean
+from src.visualization import spaghetti_plot, plot_contour_boxplot, colors
 
 colors_cvp = [colors[2], colors[1], colors[0]] 
 colors_cdclust = colors_cvp # [colors[1], colors[0], colors[2]] 
 
-from contour_depth.visualization import get_bp_cvp_elements, get_bp_depth_elements
+from src.visualization import get_bp_cvp_elements, get_bp_depth_elements
 
 from skimage.filters import gaussian
 
