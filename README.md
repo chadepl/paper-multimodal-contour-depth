@@ -30,10 +30,10 @@ Also, consider checking the paper where we introduce the [Inclusion Depth for Co
 
 ## Setup
 1. Install a conda (we recommend using [miniconda](https://docs.conda.io/projects/miniconda/en/latest/))
-2. Create environment: `conda create --name=multimodal-depth python=3.9.18`
+2. Create environment: `conda create --name=multimodal-depth python=3.9`
 3. Activate environment: `conda activate multimodal-depth`
 4. Install dependencies with pip: `pip install -r requirements.txt`
-5. To test installation, from the root of the repository run `python -c "from src.depths.inclusion_depth import compute_depths"`. No errors should be raised.
+5. To test installation, from the root of the repository run `python experiments/test_experiments_imports.py`. No errors should be raised.
 
 ## Replicating the paper results
 The scripts in the `experiments` directory permit replicating the paper's results.
