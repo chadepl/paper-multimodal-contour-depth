@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.data.synthetic_data import outlier_cluster
-from contour_depth.clustering.ddclust import kmeans_cluster_eid
-from contour_depth.clustering.inits import initial_clustering
-from contour_depth.visualization import spaghetti_plot
-from contour_depth.competing.cvp import get_cvp_sdf_pca_transform, get_cvp_clustering
+from src.data.synthetic_data import outlier_cluster
+from src.clustering.cdclust import kmeans_cluster_eid
+from src.clustering.inits import initial_clustering
+from src.visualization import spaghetti_plot
+from src.competing.cvp import get_cvp_sdf_pca_transform, get_cvp_clustering
 
 
 if __name__ == "__main__":

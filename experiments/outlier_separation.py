@@ -10,11 +10,11 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, "..")
-from contour_depth.data.synthetic_data import main_shape_with_outliers
-from contour_depth.clustering.ddclust import kmeans_cluster_inclusion_matrix
-from contour_depth.clustering.inits import initial_clustering
-from contour_depth.visualization import spaghetti_plot
-from contour_depth.competing.cvp import get_cvp_sdf_pca_transform, get_cvp_clustering
+from src.data.synthetic_data import main_shape_with_outliers
+from src.clustering.cdclust import kmeans_cluster_inclusion_matrix
+from src.clustering.inits import initial_clustering
+from src.visualization import spaghetti_plot
+from src.competing.cvp import get_cvp_sdf_pca_transform, get_cvp_clustering
 
 
 if __name__ == "__main__":
